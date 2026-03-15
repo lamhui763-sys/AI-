@@ -1,0 +1,210 @@
+# AI Investment Tool Configuration
+# AI投资工具配置文件
+
+# ================================
+# API配置
+# ================================
+
+# OpenAI API (ChatGPT)
+openai:
+  api_key: "your-openai-api-key-here"
+  model: "gpt-4"
+  temperature: 0.7
+  max_tokens: 2000
+
+# Alpha Vantage API
+alpha_vantage:
+  api_key: "your-alpha-vantage-api-key-here"
+  output_size: "full"  # compact or full
+
+# Yahoo Finance (免费，无需API Key)
+yahoo_finance:
+  enabled: true
+  timeout: 30
+
+# ================================
+# 数据配置
+# ================================
+
+database:
+  type: "sqlite"
+  path: "./data/investment.db"
+  backup_enabled: true
+  backup_interval: 3600  # 秒
+
+data_sources:
+  - yahoo_finance
+  - alpha_vantage
+
+# ================================
+# 港股配置
+# ================================
+
+hk_stocks:
+  # 用户关注的港股列表
+  watchlist:
+    - "6158.HK"  # 正荣控股
+    - "7200.HK"  # 普天通信
+    - "^HSI"      # 恒生指数
+
+  # 默认分析参数
+  default_period: "1y"  # 1y, 2y, 5y, max
+  default_interval: "1d"  # 1d, 1wk, 1mo
+
+# ================================
+# 技术分析配置
+# ================================
+
+technical_indicators:
+  # 移动平均
+  moving_averages:
+    periods: [5, 10, 20, 50, 200]
+    type: ["SMA", "EMA"]
+
+  # RSI
+  rsi:
+    period: 14
+    overbought: 70
+    oversold: 30
+
+  # MACD
+  macd:
+    fast_period: 12
+    slow_period: 26
+    signal_period: 9
+
+  # 布林带
+  bollinger_bands:
+    period: 20
+    std_dev: 2
+
+# ================================
+# 回测配置
+# ================================
+
+backtesting:
+  initial_capital: 100000  # 初始资金
+  commission: 0.001  # 手续费 0.1%
+  slippage: 0.0005  # 滑点 0.05%
+
+  # 评估指标
+  metrics:
+    - "total_return"
+    - "sharpe_ratio"
+    - "max_drawdown"
+    - "win_rate"
+    - "profit_factor"
+
+# ================================
+# AI分析配置
+# ================================
+
+ai_analysis:
+  enabled: true
+  features:
+    - "market_sentiment"
+    - "technical_summary"
+    - "risk_assessment"
+    - "recommendation"
+
+  # 分析频率
+  analysis_interval: 3600  # 每小时分析一次
+
+# ================================
+# 风险管理配置
+# ================================
+
+risk_management:
+  # 止损设置
+  stop_loss:
+    enabled: true
+    percentage: 0.05  # 5%止损
+
+  # 仓位管理
+  position_sizing:
+    enabled: true
+    method: "fixed_risk"  # fixed_risk, kelly, equal_weight
+    risk_per_trade: 0.02  # 每笔交易风险2%
+
+  # 风险预警
+  risk_alerts:
+    max_drawdown: 0.20  # 最大回撤20%
+    max_positions: 10  # 最大持仓数量
+    sector_concentration: 0.30  # 单一行业最大30%
+
+# ================================
+# 通知配置
+# ================================
+
+notifications:
+  enabled: true
+  channels:
+    - "email"
+    - "webhook"
+
+  email:
+    recipient: "makaikei2000@yahoo.com.hk"
+    smtp_server: "smtp.mail.yahoo.com"
+    smtp_port: 587
+    username: "makaikei2000@yahoo.com.hk"
+    password: "your-email-password"
+
+  webhook:
+    url: "your-webhook-url"
+
+  # 通知级别
+  alert_levels:
+    - "buy_signal"
+    - "sell_signal"
+    - "stop_loss_hit"
+    - "risk_limit"
+
+# ================================
+# Excel集成配置
+# ================================
+
+excel_integration:
+  enabled: true
+  auto_update: true
+  update_interval: 1800  # 每30分钟更新一次
+
+  # 现有Excel文件路径
+  excel_files:
+    hsi_analysis: "C:/Users/makai/WPSDrive/1034159546/WPS云盘/^HSI 202003.xlsx"
+    hk_stocks: "C:/Users/makai/WPSDrive/1034159546/WPS云盘/"
+
+# ================================
+# 可视化配置
+# ================================
+
+visualization:
+  theme: "plotly_dark"  # plotly_dark, plotly, plotly_white
+  default_charts:
+    - "candlestick"  # K线图
+    - "line"  # 线图
+    - "bar"  # 柱状图
+
+  # 图表保存
+  save_charts: true
+  save_format: "png"
+  save_path: "./output/charts/"
+
+# ================================
+# 日志配置
+# ================================
+
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "./logs/ai_inv.log"
+  max_bytes: 10485760  # 10MB
+  backup_count: 5
+
+# ================================
+# 开发模式
+# ================================
+
+development:
+  enabled: false
+  debug: false
+  test_data: true

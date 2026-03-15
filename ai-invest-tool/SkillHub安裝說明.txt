@@ -1,0 +1,162 @@
+================================
+SkillHub CLI 安裝說明
+================================
+
+根據官方文檔，安裝 SkillHub CLI
+
+================================
+🚀 安裝方法（Windows）
+================================
+
+方法1：使用安裝腳本（推薦）
+------------------------------
+1. 打開文件夾：
+   C:\Users\makai\WorkBuddy\Claw\ai-invest-tool
+
+2. 雙擊文件：
+   install_skillhub.bat
+
+3. 等待安裝完成
+
+4. 重新啟動終端
+
+5. 驗證安裝：
+   skillhub --version
+
+
+方法2：手動安裝
+------------------------------
+1. 創建目錄：
+   %USERPROFILE%\.skillhub\bin
+
+2. 下載 CLI：
+   URL: https://skillhub-1388575217.cos.ap-guangzhou.myqcloud.com/cli/skillhub.exe
+   保存到: %USERPROFILE%\.skillhub\bin\skillhub.exe
+
+3. 添加到 PATH：
+   將 %USERPROFILE%\.skillhub\bin 添加到用戶 PATH 環境變量
+
+4. 重新啟動終端
+
+5. 驗證：
+   skillhub --version
+
+
+================================
+📚 常用命令
+================================
+
+安裝完成後，可以使用以下命令：
+
+搜索技能：
+skillhub search [關鍵詞]
+
+示例：
+skillhub search pdf
+skillhub search excel
+skillhub search web
+
+安裝技能：
+skillhub install [技能名]
+
+示例：
+skillhub install pdf-skill
+skillhub install excel-skill
+
+列出已安裝技能：
+skillhub list
+
+查看幫助：
+skillhub --help
+
+
+================================
+⚠️ 安全提示
+================================
+
+此安裝會從遠程服務器下載文件：
+https://skillhub-1388575217.cos.ap-guangzhou.myqcloud.com
+
+請確保您信任該來源。
+
+
+================================
+🔍 安裝位置
+================================
+
+CLI 文件：
+%USERPROFILE%\.skillhub\bin\skillhub.exe
+
+配置文件：
+%USERPROFILE%\.skillhub\config.yaml
+
+技能目錄：
+%USERPROFILE%\.skillhub\skills\
+
+
+================================
+❓ 故障排除
+================================
+
+問題1：命令找不到
+解決：
+- 重新啟動終端
+- 檢查 PATH 是否包含 %USERPROFILE%\.skillhub\bin
+
+問題2：下載失敗
+解決：
+- 檢查網絡連接
+- 使用代理或 VPN
+- 手動下載並放置到正確位置
+
+問題3：權限錯誤
+解決：
+- 以管理員身份運行安裝腳本
+
+
+================================
+📝 安裝後配置
+================================
+
+安裝完成後：
+
+1. 重啟 OpenClaw Agent
+   - 讓系統識別 SkillHub
+   - 啟用加速功能
+
+2. 在 OpenClaw 中使用
+   - 可以直接用自然語言安裝技能
+   - 例如：「安裝 pdf 技能」
+
+
+================================
+✅ 驗證安裝
+================================
+
+運行以下命令驗證：
+
+skillhub --version
+
+如果顯示版本號，說明安裝成功！
+
+
+================================
+📖 更多信息
+================================
+
+官方文檔：
+https://skillhub-1388575217.cos.ap-guangzhou.myqcloud.com/install/skillhub.md
+
+
+================================
+🎯 快速開始
+================================
+
+1. 雙擊 install_skillhub.bat
+2. 等待安裝完成
+3. 重啟終端
+4. 運行: skillhub --version
+5. 開始使用！
+
+
+================================

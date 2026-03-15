@@ -1,0 +1,56 @@
+📤 上传AI投资工具到GitHub
+
+已为您准备好一切！请按以下步骤操作：
+
+🔧 第一步：安装Git（如果尚未安装）
+-----------------------------------
+1. 访问 https://git-scm.com/download/win
+2. 下载并安装Git for Windows
+3. 使用默认设置即可
+
+或运行项目中的安装脚本：
+- 双击 `install_git.bat` 获取详细指南
+
+🚀 第二步：上传代码到GitHub
+-----------------------------------
+方法A：使用交互式脚本（推荐）
+1. 双击 `upload_to_github.bat`
+2. 按照提示操作
+3. 输入您的GitHub仓库地址
+
+方法B：手动操作
+1. 阅读 `GITHUB_UPLOAD_GUIDE.md`
+2. 按照16个步骤操作
+
+📝 重要信息
+---------------
+您的GitHub仓库：https://github.com/lamhui763-sys/AI-
+
+⚠️ 注意：这个地址可能不完整！
+请先确认完整的仓库地址，例如：
+https://github.com/lamhui763-sys/AI-invest-tool.git
+
+✅ 已准备好的文件
+-------------------
+- 📘 GITHUB_UPLOAD_GUIDE.md - 详细指南
+- 🖱️ upload_to_github.bat - 一键上传脚本
+- ⚙️ .gitignore - 已配置忽略临时文件
+- 📄 README_FIRST.txt - 已更新包含上传选项
+
+📁 项目位置
+-------------
+C:\Users\makai\WorkBuddy\Claw\ai-invest-tool
+
+💡 提示
+---------
+1. 首次推送可能需要GitHub身份验证
+2. 推荐使用个人访问令牌代替密码
+3. 如果使用SSH，需要配置SSH密钥
+
+🆘 遇到问题？
+---------------
+查看：GITHUB_UPLOAD_GUIDE.md 中的"故障排除"部分
+
+🎯 现在就开始！
+---------------
+双击 `upload_to_github.bat` 开始上传！

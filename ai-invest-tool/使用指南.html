@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI投資工具 - 使用指南</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        .header h1 { font-size: 36px; margin-bottom: 10px; }
+        .header p { font-size: 18px; opacity: 0.9; }
+        .content { padding: 40px; }
+        .section { margin-bottom: 30px; }
+        .section h2 {
+            color: #667eea;
+            font-size: 24px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .steps {
+            background: #f5f5f5;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 20px 0;
+        }
+        .step {
+            margin: 15px 0;
+            padding: 15px;
+            background: white;
+            border-left: 4px solid #667eea;
+            border-radius: 5px;
+        }
+        .step-number {
+            font-weight: bold;
+            color: #667eea;
+            font-size: 18px;
+            margin-bottom: 8px;
+        }
+        .button {
+            display: inline-block;
+            background: #667eea;
+            color: white;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            margin: 10px;
+            cursor: pointer;
+            border: none;
+        }
+        .button:hover { background: #764ba2; }
+        .button-container { text-align: center; margin: 30px 0; }
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        .warning-box {
+            background: #fff3e0;
+            border-left: 4px solid #ff9800;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        .success-box {
+            background: #e8f5e9;
+            border-left: 4px solid #4caf50;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 5px;
+        }
+        .code {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            margin: 10px 0;
+        }
+        .footer {
+            background: #2d2d2d;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📈 AI投資工具</h1>
+            <p>智能股票分析與投資決策系統</p>
+        </div>
+
+        <div class="content">
+            <div class="section">
+                <h2>🎯 快速啟動指南</h2>
+                
+                <div class="success-box">
+                    <strong>✅ 工具已準備就緒！</strong><br>
+                    所有文件已安裝完成，現在可以開始使用。
+                </div>
+
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-number">第1步：打開文件夾</div>
+                        <p>在文件管理器中打開：</p>
+                        <div class="code">C:\Users\makai\WorkBuddy\Claw\ai-invest-tool</div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-number">第2步：選擇啟動方式</div>
+                        
+                        <div class="info-box">
+                            <strong>方式A：使用測試模式（推薦）</strong>
+                            <p>雙擊文件：<strong>運行測試.bat</strong></p>
+                            <p>這會檢查Python和依賴是否正確安裝</p>
+                        </div>
+
+                        <div class="info-box">
+                            <strong>方式B：一鍵安裝</strong>
+                            <p>雙擊文件：<strong>一鍵安裝.bat</strong></p>
+                            <p>這會安裝所有依賴（首次使用需要2-5分鐘）</p>
+                        </div>
+
+                        <div class="info-box">
+                            <strong>方式C：直接啟動</strong>
+                            <p>雙擊文件：<strong>啟動AI工具.bat</strong></p>
+                            <p>這會直接啟動Web應用</p>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-number">第3步：在瀏覽器中打開</div>
+                        <p>應用啟動後，瀏覽器會自動打開：</p>
+                        <div class="code">http://localhost:8501</div>
+                        <p>如果沒有自動打開，手動在瀏覽器輸入這個地址</p>
+                    </div>
+                </div>
+
+                <div class="button-container">
+                    <a href="file:///C:/Users/makai/WorkBuddy/Claw/ai-invest-tool" class="button">📁 打開項目文件夾</a>
+                    <a href="http://localhost:8501" class="button" target="_blank">🌐 打開Web應用</a>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>📋 系統狀態</h2>
+                
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-number">✅ 已完成</div>
+                        <p>• 項目文件已創建</p>
+                        <p>• Web Dashboard已準備</p>
+                        <p>• 測試腳本已準備</p>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-number">⏳ 需要檢查</div>
+                        <p>• Python是否已安裝</p>
+                        <p>• 依賴包是否已安裝</p>
+                        <p>• Streamlit是否正常運行</p>
+                    </div>
+                </div>
+
+                <div class="warning-box">
+                    <strong>⚠️ 重要提示：</strong>
+                    <ul style="margin-top: 10px; margin-left: 20px;">
+                        <li>首次運行需要安裝Python依賴，可能需要2-5分鐘</li>
+                        <li>請確保已安裝Python 3.8或更高版本</li>
+                        <li>安裝Python時務必勾選「Add Python to PATH」</li>
+                        <li>需要穩定的網絡連接獲取股票數據</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>📚 功能介紹</h2>
+                
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-number">📊 股票分析</div>
+                        <p>輸入股票代碼，查看即時數據、技術指標和交易信號</p>
+                        <p><strong>示例：</strong> ^HSI（恒生指數）、6158.HK（海爾智家）</p>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-number">🔬 技術分析</div>
+                        <p>選擇多種技術指標（RSI、MACD、布林帶等），查看交互式圖表</p>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-number">🤖 AI分析</div>
+                        <p>使用ChatGPT進行智能分析，獲取投資建議</p>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-number">⏱️ 回測引擎</div>
+                        <p>測試交易策略，查看歷史表現和性能指標</p>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-number">💼 投資組合</div>
+                        <p>管理您的投資組合，實時更新持倉價值</p>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-number">📰 新聞分析</div>
+                        <p>分析新聞情感，提取關鍵詞</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>AI投資工具 v1.0.0 | 2026年3月13日</p>
+            <p>🎉 祝您投資成功！</p>
+        </div>
+    </div>
+</body>
+</html>

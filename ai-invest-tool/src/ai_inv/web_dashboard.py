@@ -306,11 +306,18 @@ def ai_analysis_page():
     """AI分析页面"""
     st.header("🤖 AI分析")
     
-    # 配置OpenAI API
-    st.sidebar.subheader("OpenAI配置")
-    api_key = st.sidebar.text_input("API Key", type="password")
-    if api_key:
-        os.environ['OPENAI_API_KEY'] = api_key
+    # 配置 AI API
+    st.sidebar.subheader("AI 配置")
+    ai_provider = st.sidebar.selectbox("AI 提供商", ["Gemini", "OpenAI"], index=0)
+    
+    if ai_provider == "Gemini":
+        gemini_key = st.sidebar.text_input("Gemini API Key", type="password", value=os.getenv('GEMINI_API_KEY', ''))
+        if gemini_key:
+            os.environ['GEMINI_API_KEY'] = gemini_key
+    else:
+        openai_key = st.sidebar.text_input("OpenAI API Key", type="password", value=os.getenv('OPENAI_API_KEY', ''))
+        if openai_key:
+            os.environ['OPENAI_API_KEY'] = openai_key
     
     # 股票选择
     symbol = st.text_input("股票代码", value="^HSI")

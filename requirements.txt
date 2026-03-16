@@ -1,11 +1,2 @@
-streamlit
-pandas
-numpy
-yfinance
-plotly
-openai
-scikit-learn
-streamlit-option-menu
-openpyxl
-requests
-beautifulsoup4
+# Empty requirements to bypass Streamlit Cloud's installation phase
+# Dependencies will be installed dynamically in streamlit_app.py

@@ -20,15 +20,12 @@ except ImportError:
     YAML_AVAILABLE = False
     print("Warning: PyYAML not installed. Using default configuration.")
 
-# 添加项目根目录到Python路径
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root))
-
-from ai_inv.data_fetcher import DataFetcher
-from ai_inv.technical_analysis import TechnicalAnalyzer
-from ai_inv.ai_analyzer import AIAnalyzer
-from ai_inv.backtesting import BacktestingEngine
-from ai_inv.excel_integration import ExcelIntegrator
+# 移除導入以避免循環
+# from .data_fetcher import DataFetcher
+# from .technical_analyzer import TechnicalAnalyzer
+# from .ai_analyzer import AIAnalyzer
+# from .backtesting import BacktestingEngine
+# from .excel_integration import ExcelIntegrator
 
 
 class InvestmentTool:

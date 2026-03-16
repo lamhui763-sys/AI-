@@ -17,24 +17,24 @@ from typing import Optional, Dict, List
 class DataFetcher:
     """数据获取器"""
 
-    def __init__(self, config):
+    def __init__(self, config: Optional[Dict] = None):
         """
         初始化数据获取器
 
         Args:
             config: 配置字典
         """
-        self.config = config
+        self.config = config or {}
         self.logger = logging.getLogger(__name__)
 
         # Yahoo Finance配置
-        self.yf_enabled = config.get('yahoo_finance', {}).get('enabled', True)
-        self.yf_timeout = config.get('yahoo_finance', {}).get('timeout', 30)
+        self.yf_enabled = self.config.get('yahoo_finance', {}).get('enabled', True)
+        self.yf_timeout = self.config.get('yahoo_finance', {}).get('timeout', 30)
 
         # Alpha Vantage配置
-        self.av_enabled = 'alpha_vantage' in config
-        self.av_api_key = config.get('alpha_vantage', {}).get('api_key', '')
-        self.av_output_size = config.get('alpha_vantage', {}).get('output_size', 'full')
+        self.av_enabled = 'alpha_vantage' in self.config
+        self.av_api_key = self.config.get('alpha_vantage', {}).get('api_key', '')
+        self.av_output_size = self.config.get('alpha_vantage', {}).get('output_size', 'full')
 
         self.logger.info("DataFetcher initialized")
 

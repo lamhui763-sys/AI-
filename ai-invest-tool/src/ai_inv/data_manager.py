@@ -18,19 +18,19 @@ from .data_processor import DataProcessor
 class DataManager:
     """数据管理器 - 统一接口"""
 
-    def __init__(self, config):
+    def __init__(self, config: Optional[Dict] = None):
         """
         初始化数据管理器
 
         Args:
             config: 配置字典
         """
-        self.config = config
+        self.config = config or {}
         self.logger = logging.getLogger(__name__)
 
-        # 初始化子模块
-        self.fetcher = DataFetcher(config)
-        self.processor = DataProcessor(config)
+        # 初始化组件
+        self.fetcher = DataFetcher(self.config)
+        self.processor = DataProcessor(self.config)
 
         # 缓存
         self._cache = {}

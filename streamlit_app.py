@@ -1,35 +1,9 @@
 import sys
 import os
-import subprocess
 import streamlit as st
 
 # 設置頁面配置
 st.set_page_config(page_title="AI 投資工具啟動器", layout="wide")
-
-def install_package(package):
-    """動態安裝缺失的包"""
-    try:
-        subprocess.check_call([sys.executable, "-m", "pip", "install", package])
-        return True
-    except Exception as e:
-        st.error(f"安裝 {package} 失敗: {e}")
-        return False
-
-# 核心依賴項檢查
-essential_packages = [
-    "yfinance", "pandas", "numpy", "plotly", "openai", 
-    "scikit-learn", "streamlit_option_menu", "openpyxl", 
-    "requests", "beautifulsoup4", "pyyaml", "python-dotenv"
-]
-
-# 檢查並安裝缺失的包
-with st.spinner("正在檢查並準備運行環境..."):
-    for pkg in essential_packages:
-        try:
-            __import__(pkg.replace("-", "_"))
-        except ImportError:
-            st.info(f"正在安裝必要的組件: {pkg}...")
-            install_package(pkg)
 
 # 將專案路徑添加到 Python 路徑中
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -48,7 +22,7 @@ try:
         main()
 except ImportError as e:
     st.error(f"❌ 模組導入失敗: {e}")
-    st.info("💡 請嘗試點擊右下角的 'Manage app' -> 'Reboot App'。")
+    st.info("💡 這通常是因為 Streamlit Cloud 還在安裝依賴項，或者 requirements.txt 尚未生效。")
     st.write("### 當前環境診斷：")
     st.write(f"- **Python 版本**: {sys.version}")
     st.write(f"- **專案目錄是否存在**: {os.path.exists(project_root)}")

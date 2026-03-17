@@ -50,7 +50,7 @@ class TechnicalAnalyzer:
         # 获取数据
         data = self.data_manager.get_stock_data(symbol, period=period, interval=interval)
         
-        if data.empty:
+        if data is None or data.empty:
             self.logger.error(f"无法获取股票 {symbol} 的数据")
             return pd.DataFrame()
         
@@ -110,7 +110,7 @@ class TechnicalAnalyzer:
         # 分析股票
         data = self.analyze_stock(symbol, period=period)
         
-        if data.empty:
+        if data is None or data.empty:
             return {'error': '无法获取数据'}
         
         # 获取摘要
@@ -172,7 +172,7 @@ class TechnicalAnalyzer:
             try:
                 data = self.analyze_stock(symbol, period='3m')
                 
-                if data.empty:
+                if data is None or data.empty:
                     continue
                 
                 # 获取最新信号
@@ -214,14 +214,14 @@ class TechnicalAnalyzer:
         # 获取分析数据
         data = self.analyze_stock(symbol, period=period)
         
-        if data.empty:
+        if data is None or data.empty:
             return f"无法获取股票 {symbol} 的数据"
         
         # 获取摘要
         summary = self.indicators.get_summary(data)
         
         # 生成报告
-        report = f"""
+        report = f\"\"\"
 {'='*60}
 技术分析报告
 {'='*60}
@@ -239,60 +239,60 @@ class TechnicalAnalyzer:
 {'='*60}
 二、趋势指标
 {'='*60}
-"""
+\"\"\"
         for key, value in summary['趋势指标'].items():
-            report += f"{key}: {value}\n"
+            report += f"{key}: {value}\\n"
         
-        report += f"""
+        report += f\"\"\"
 {'='*60}
 三、动量指标
 {'='*60}
-"""
+\"\"\"
         for key, value in summary['动量指标'].items():
-            report += f"{key}: {value}\n"
+            report += f"{key}: {value}\\n"
         
         if '交易信号' in summary:
-            report += f"""
+            report += f\"\"\"
 {'='*60}
 四、交易信号
 {'='*60}
 信号: {summary['交易信号']}
 强度: {summary['信号强度']}/5
-"""
+\"\"\"
         
         # 添加技术建议
         signal = summary.get('交易信号', 'HOLD')
         rsi = float(summary.get('动量指标', {}).get('RSI', 50))
         
-        report += f"""
+        report += f\"\"\"
 {'='*60}
 五、技术建议
 {'='*60}
-"""
+\"\"\"
         
         if signal == 'STRONG BUY':
-            report += "建议: 强力买入\n"
-            report += "理由: 多项技术指标显示买入信号\n"
+            report += "建议: 强力买入\\n"
+            report += "理由: 多项技术指标显示买入信号\\n"
         elif signal == 'BUY':
-            report += "建议: 买入\n"
-            report += "理由: 技术指标偏多\n"
+            report += "建议: 买入\\n"
+            report += "理由: 技术指标偏多\\n"
         elif signal == 'STRONG SELL':
-            report += "建议: 强力卖出\n"
-            report += "理由: 多项技术指标显示卖出信号\n"
+            report += "建议: 强力卖出\\n"
+            report += "理由: 多项技术指标显示卖出信号\\n"
         elif signal == 'SELL':
-            report += "建议: 卖出\n"
-            report += "理由: 技术指标偏空\n"
+            report += "建议: 卖出\\n"
+            report += "理由: 技术指标偏空\\n"
         else:
-            report += "建议: 观望\n"
-            report += "理由: 技术指标显示中性\n"
+            report += "建议: 观望\\n"
+            report += "理由: 技术指标显示中性\\n"
         
         # 风险提示
         if rsi > 80:
-            report += "\n风险提示: RSI极高，存在回调风险\n"
+            report += "\\n风险提示: RSI极高，存在回调风险\\n"
         elif rsi < 20:
-            report += "\n机会提示: RSI极低，可能存在反弹机会\n"
+            report += "\\n机会提示: RSI极低，可能存在反彈機會\\n"
         
-        report += f"\n{'='*60}\n"
+        report += f"\\n{'='*60}\\n"
         
         return report
     
@@ -314,7 +314,7 @@ class TechnicalAnalyzer:
             # 获取分析数据
             data = self.analyze_stock(symbol, period=period)
             
-            if data.empty:
+            if data is None or data.empty:
                 self.logger.error("没有数据可导出")
                 return False
             
@@ -382,7 +382,7 @@ class TechnicalAnalyzer:
         """
         data = self.analyze_stock(symbol, period=period)
         
-        if data.empty:
+        if data is None or data.empty:
             return {'error': '无法获取数据'}
         
         latest = data.iloc[-1]

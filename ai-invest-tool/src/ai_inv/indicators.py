@@ -530,6 +530,7 @@ class TechnicalIndicators:
         # 交易信号
         if 'Signal' in df.columns:
             summary['交易信号'] = df['Signal'].iloc[-1]
-            summary['信号强度'] = int(df['Signal_Strength'].iloc[-1])
+            summary['强度'] = int(df['Signal_Strength'].iloc[-1])
+            summary['信号强度'] = int(df['Signal_Strength'].iloc[-1]) # 保持兼容性
         
         return summary

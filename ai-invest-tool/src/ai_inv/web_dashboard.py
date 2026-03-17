@@ -15,7 +15,7 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Union
 from datetime import datetime, timedelta
 import sys
 import os
@@ -817,16 +817,22 @@ def plot_price_chart(data: pd.DataFrame, indicators: Dict[str, Any]):
     st.plotly_chart(fig, use_container_width=True)
 
 
-def plot_rsi_chart(indicators: Dict[str, Any]):
+def plot_rsi_chart(indicators: Union[Dict[str, Any], pd.DataFrame]):
     """绘制RSI图表"""
-    if 'RSI' not in indicators:
-        return
+    if isinstance(indicators, pd.DataFrame):
+        if 'RSI_14' not in indicators.columns:
+            return
+        rsi_data = indicators['RSI_14']
+    else:
+        if 'RSI' not in indicators:
+            return
+        rsi_data = indicators['RSI']
     
     fig = go.Figure()
     
     fig.add_trace(go.Scatter(
-        x=indicators['RSI'].index,
-        y=indicators['RSI'],
+        x=rsi_data.index,
+        y=rsi_data,
         mode='lines',
         name='RSI',
         line=dict(color='purple')
@@ -846,34 +852,43 @@ def plot_rsi_chart(indicators: Dict[str, Any]):
     st.plotly_chart(fig, use_container_width=True)
 
 
-def plot_macd_chart(indicators: Dict[str, Any]):
+def plot_macd_chart(indicators: Union[Dict[str, Any], pd.DataFrame]):
     """绘制MACD图表"""
-    if 'MACD' not in indicators:
-        return
-    
-    macd = indicators['MACD']
+    if isinstance(indicators, pd.DataFrame):
+        if 'MACD' not in indicators.columns:
+            return
+        macd_line = indicators['MACD']
+        signal_line = indicators['MACD_Signal']
+        histogram = indicators['MACD_Histogram']
+    else:
+        if 'MACD' not in indicators:
+            return
+        macd = indicators['MACD']
+        macd_line = macd['macd']
+        signal_line = macd['signal']
+        histogram = macd['histogram']
     
     fig = go.Figure()
     
     fig.add_trace(go.Scatter(
-        x=macd['macd'].index,
-        y=macd['macd'],
+        x=macd_line.index,
+        y=macd_line,
         mode='lines',
         name='MACD',
         line=dict(color='blue')
     ))
     
     fig.add_trace(go.Scatter(
-        x=macd['signal'].index,
-        y=macd['signal'],
+        x=signal_line.index,
+        y=signal_line,
         mode='lines',
         name='Signal',
         line=dict(color='orange')
     ))
     
     fig.add_trace(go.Bar(
-        x=macd['histogram'].index,
-        y=macd['histogram'],
+        x=histogram.index,
+        y=histogram,
         name='Histogram'
     ))
     

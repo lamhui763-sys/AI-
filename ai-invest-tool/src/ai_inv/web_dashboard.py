@@ -1,4 +1,4 @@
-'''"""
+"""
 Web仪表板模块
 使用Streamlit创建交互式Web界面
 
@@ -312,20 +312,25 @@ def ai_analysis_page():
 
     # 安全地加载和设置API密钥
     api_key_configured = False
-    if ai_provider == "Gemini":
-        if 'GEMINI_API_KEY' in st.secrets:
-            os.environ['GEMINI_API_KEY'] = st.secrets['GEMINI_API_KEY']
-            api_key_configured = True
-        else:
-            st.sidebar.warning("请设置 Gemini API 密钥！")
-            st.info("💡 如何设置: 部署到 Streamlit Cloud 后，进入应用的 'Settings' -> 'Secrets'，添加一个名为 `GEMINI_API_KEY` 的新密钥，并将您的密钥值粘贴进去。")
-    else: # OpenAI
-        if 'OPENAI_API_KEY' in st.secrets:
-            os.environ['OPENAI_API_KEY'] = st.secrets['OPENAI_API_KEY']
-            api_key_configured = True
-        else:
-            st.sidebar.warning("请设置 OpenAI API 密钥！")
-            st.info("💡 如何设置: 部署到 Streamlit Cloud 后，进入应用的 'Settings' -> 'Secrets'，添加一个名为 `OPENAI_API_KEY` 的新密钥，并将您的密钥值粘贴进去。")
+    try:
+        if ai_provider == "Gemini":
+            if 'GEMINI_API_KEY' in st.secrets:
+                os.environ['GEMINI_API_KEY'] = st.secrets['GEMINI_API_KEY']
+                api_key_configured = True
+            else:
+                st.sidebar.warning("请设置 Gemini API 密钥！")
+                st.info("💡 如何设置: 部署到 Streamlit Cloud 后，进入应用的 'Settings' -> 'Secrets'，添加一个名为 `GEMINI_API_KEY` 的新密钥，并将您的密钥值粘贴进去。")
+        else: # OpenAI
+            if 'OPENAI_API_KEY' in st.secrets:
+                os.environ['OPENAI_API_KEY'] = st.secrets['OPENAI_API_KEY']
+                api_key_configured = True
+            else:
+                st.sidebar.warning("请设置 OpenAI API 密钥！")
+                st.info("💡 如何设置: 部署到 Streamlit Cloud 后，进入应用的 'Settings' -> 'Secrets'，添加一个名为 `OPENAI_API_KEY` 的新密钥，并将您的密钥值粘贴进去。")
+    except Exception as e:
+        # st.secrets在本地运行时会引发错误，所以我们在这里处理它
+        st.sidebar.info("在本地运行时，请将您的API密钥设置为环境变量。")
+
 
     # 股票选择
     symbol = st.text_input("股票代码", value="^HSI")
@@ -1136,4 +1141,3 @@ def display_technical_details(indicators: Dict[str, Any]):
 
 if __name__ == "__main__":
     main()
-''

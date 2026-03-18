@@ -1,4 +1,4 @@
-"""
+'''
 Web仪表板模块
 使用Streamlit创建交互式Web界面
 
@@ -8,7 +8,7 @@ Web仪表板模块
 - 交互式图表
 - AI分析结果展示
 - 回测结果可视化
-"""
+'''
 
 import streamlit as st
 import pandas as pd
@@ -34,7 +34,7 @@ from src.ai_inv.excel_visualizer import ExcelVisualizer
 
 
 def main():
-    """主函数 - Streamlit应用"""
+    '''主函数 - Streamlit应用'''
     
     # 页面配置
     st.set_page_config(
@@ -67,7 +67,7 @@ def main():
 
 
 def stock_analysis_page():
-    """股票分析页面"""
+    '''股票分析页面'''
     st.header("📊 股票分析")
     
     st.sidebar.subheader("股票配置")
@@ -113,6 +113,8 @@ def stock_analysis_page():
             with tab:
                 if result['error']:
                     st.error(f"❌ 错误: {result['error']}")
+                elif result.get('data') is None or result['data'].empty:
+                    st.warning("未找到该股票的数据。")
                 else:
                     col1, col2, col3, col4 = st.columns(4)
                     with col1:
@@ -124,25 +126,36 @@ def stock_analysis_page():
                             change = latest_price - prev_close
                             change_pct = (change / prev_close) * 100 if prev_close != 0 else 0
                             st.metric("日涨跌", f"{change:+.2f}", f"{change_pct:+.2f}%")
+                    
+                    signal_data = result.get('signal', {})
                     with col3:
-                        st.metric("交易信号", result['signal']['交易信号'])
+                        st.metric("交易信号", signal_data.get('signal', 'N/A'))
                     with col4:
-                        st.metric("信号强度", result['signal']['强度'])
+                        st.metric("信号强度", signal_data.get('strength', 'N/A'))
                     
                     st.divider()
+                    
                     st.subheader("价格走势")
-                    plot_price_chart(result['data'], result['indicators'])
+                    if result.get('indicators') and result.get('data') is not None:
+                        plot_price_chart(result['data'], result['indicators'])
+                    else:
+                        st.write("无法生成价格图表。")
+                    
                     st.subheader("技术指标")
-                    c1, c2 = st.columns(2)
-                    with c1:
-                        plot_rsi_chart(result['indicators'])
-                    with c2:
-                        plot_macd_chart(result['indicators'])
-                    with st.expander("📋 详细技术分析"):
-                        display_technical_details(result['indicators'])
+                    if result.get('indicators'):
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            plot_rsi_chart(result['indicators'])
+                        with c2:
+                            plot_macd_chart(result['indicators'])
+                        with st.expander("📋 详细技术分析"):
+                            display_technical_details(result['indicators'])
+                    else:
+                        st.write("无法生成技术指标图表。")
+
 
 def technical_analysis_page():
-    """技术分析页面"""
+    '''技术分析页面'''
     st.header("🔬 技术分析")
     symbol = st.text_input("股票代码", value="^HSI")
     st.subheader("选择技术指标")
@@ -168,6 +181,8 @@ def technical_analysis_page():
                     all_indicators = indicators.calculate_all_indicators(data)
                     st.session_state.tech_data = data
                     st.session_state.tech_indicators = all_indicators
+                else:
+                    st.warning("无法获取数据。")
             except Exception as e:
                 st.error(f"❌ 错误: {str(e)}")
     
@@ -182,7 +197,7 @@ def technical_analysis_page():
         if show_atr: plot_atr_chart(indicators)
 
 def ai_analysis_page():
-    """AI分析页面"""
+    '''AI分析页面'''
     st.header("🤖 AI分析")
     st.sidebar.subheader("AI 配置")
     
@@ -232,23 +247,26 @@ def ai_analysis_page():
         if result.get("error"):
             st.error(f"❌ 分析失败: {result['error'] }")
         else:
-            rec = result['recommendation']
+            rec = result.get('recommendation', {})
             c1, c2, c3 = st.columns(3)
-            c1.metric("投资建议", rec['action'])
-            c2.metric("综合评分", f"{rec['overall_score']:.1f}/10")
-            c3.metric("置信度", f"{rec['confidence']:.1%}")
+            c1.metric("投资建议", rec.get('action', 'N/A'))
+            c2.metric("综合评分", f"{rec.get('overall_score', 0):.1f}/10")
+            c3.metric("置信度", f"{rec.get('confidence', 0):.1%}")
+            
             with st.expander("📊 技术面分析", expanded=True):
-                tech = result['technical']
-                st.write(f"评分: {tech['score']}/10 | 信号: {tech['signal']} | 趋势: {tech['trend']}")
+                tech = result.get('technical', {})
+                st.write(f"评分: {tech.get('score', 'N/A')}/10 | 信号: {tech.get('signal', 'N/A')} | 趋势: {tech.get('trend', 'N/A')}")
+            
             with st.expander("🤖 AI分析", expanded=True):
-                ai = result['ai']
-                st.write(f"评分: {ai['score']}/10 | 建议: {ai.get('recommendation', 'N/A')}")
+                ai = result.get('ai', {})
+                st.write(f"评分: {ai.get('score', 'N/A')}/10 | 建议: {ai.get('recommendation', 'N/A')}")
+
             with st.expander("😊 情感分析", expanded=True):
-                sent = result['sentiment']
-                st.write(f"评分: {sent['score']}/10 | 情感: {sent['overall']}")
+                sent = result.get('sentiment', {})
+                st.write(f"评分: {sent.get('score', 'N/A')}/10 | 情感: {sent.get('overall', 'N/A')}")
 
 def backtest_page():
-    """回测页面"""
+    '''回测页面'''
     st.header("⏱️ 回测引擎")
     st.sidebar.subheader("回测配置")
     strategy_type = st.sidebar.selectbox("选择策略", ["移动平均交叉", "RSI", "MACD"])
@@ -281,33 +299,40 @@ def backtest_page():
                 if data is not None and not data.empty:
                     results = engine.run_backtest(data, strategy)
                     st.session_state.backtest_results = results
+                else:
+                    st.warning("无法获取数据进行回测。")
             except Exception as e:
                 st.error(f"❌ 错误: {str(e)}")
 
     if 'backtest_results' in st.session_state:
         res = st.session_state.backtest_results
         st.subheader(f"{symbol} - {strategy_type}策略回测结果")
-        summary = res['summary']
+        summary = res.get('summary', {})
         c1, c2, c3, c4 = st.columns(4)
-        c1.metric("总收益", f"{summary['total_return']:.2f}%")
-        c2.metric("年化收益", f"{summary['annual_return']:.2f}%")
-        c3.metric("夏普比率", f"{summary['sharpe_ratio']:.2f}")
-        c4.metric("最大回撤", f"{summary['max_drawdown']:.2f}%")
-        st.subheader("资金曲线")
-        plot_equity_curve(res['equity_curve'])
+        c1.metric("总收益", f"{summary.get('total_return', 0):.2f}%")
+        c2.metric("年化收益", f"{summary.get('annual_return', 0):.2f}%")
+        c3.metric("夏普比率", f"{summary.get('sharpe_ratio', 0):.2f}")
+        c4.metric("最大回撤", f"{summary.get('max_drawdown', 0):.2f}%")
+        
+        if 'equity_curve' in res and not res['equity_curve'].empty:
+            st.subheader("资金曲线")
+            plot_equity_curve(res['equity_curve'])
+
         st.subheader("交易统计")
         c1, c2 = st.columns(2)
-        c1.metric("交易次数", summary['total_trades'])
-        c1.metric("盈利交易", summary['winning_trades'])
-        c1.metric("亏损交易", summary['losing_trades'])
-        c2.metric("胜率", f"{summary['win_rate']:.2f}%")
-        c2.metric("平均盈利", f"{summary['avg_win']:.2f}")
-        c2.metric("平均亏损", f"{summary['avg_loss']:.2f}")
-        with st.expander("交易记录"):
-            st.dataframe(res['trades'])
+        c1.metric("交易次数", summary.get('total_trades', 0))
+        c1.metric("盈利交易", summary.get('winning_trades', 0))
+        c1.metric("亏损交易", summary.get('losing_trades', 0))
+        c2.metric("胜率", f"{summary.get('win_rate', 0):.2f}%")
+        c2.metric("平均盈利", f"{summary.get('avg_win', 0):.2f}")
+        c2.metric("平均亏损", f"{summary.get('avg_loss', 0):.2f}")
+        
+        if 'trades' in res and not res['trades'].empty:
+            with st.expander("交易记录"):
+                st.dataframe(res['trades'])
 
 def portfolio_page():
-    """投资组合页面"""
+    '''投资组合页面'''
     st.header("💼 投资组合分析")
     st.subheader("输入持仓")
 
@@ -328,7 +353,7 @@ def portfolio_page():
         data = []
         for h in st.session_state.holdings:
             price_data = fetcher.get_historical_data(h['symbol'], period='5d')
-            price = price_data['Close'].iloc[-1] if price_data is not None else h['avg_price']
+            price = price_data['Close'].iloc[-1] if price_data is not None and not price_data.empty else h['avg_price']
             market_val = price * h['shares']
             cost = h['avg_price'] * h['shares']
             pnl = market_val - cost
@@ -364,7 +389,7 @@ def portfolio_page():
         st.rerun()
 
 def news_analysis_page():
-    """新闻分析页面"""
+    '''新闻分析页面'''
     st.header("📰 新闻情感分析")
     
     api_key_configured = False
@@ -392,10 +417,10 @@ def news_analysis_page():
                     
                     st.subheader("情感分析结果")
                     c1, c2, c3 = st.columns(3)
-                    emoji = "😊" if result['sentiment'] == 'positive' else "😔" if result['sentiment'] == 'negative' else "😐"
-                    c1.metric("情感倾向", f"{emoji} {result['sentiment'].upper()}")
-                    c2.metric("情感分数", f"{result['score']:.2f}")
-                    c3.metric("置信度", f"{result['confidence']:.1%}")
+                    emoji = "😊" if result.get('sentiment') == 'positive' else "😔" if result.get('sentiment') == 'negative' else "😐"
+                    c1.metric("情感倾向", f"{emoji} {result.get('sentiment', 'N/A').upper()}")
+                    c2.metric("情感分数", f"{result.get('score', 0):.2f}")
+                    c3.metric("置信度", f"{result.get('confidence', 0):.1%}")
                     
                     if result.get('keywords'):
                         st.write("**关键词:** " + " | ".join(result['keywords']))
@@ -404,14 +429,17 @@ def news_analysis_page():
 
 # --- Plotting Functions ---
 def plot_price_chart(data, indicators):
+    if data is None or data.empty: return
     fig = go.Figure(go.Candlestick(x=data.index, open=data['Open'], high=data['High'], low=data['Low'], close=data['Close'], name='价格'))
-    for period, sma in indicators.get('SMA', {}).items():
-        fig.add_trace(go.Scatter(x=data.index, y=sma, mode='lines', name=f'SMA{period}'))
+    sma_indicators = indicators.get('SMA', {})
+    if sma_indicators:
+        for period, sma in sma_indicators.items():
+            fig.add_trace(go.Scatter(x=data.index, y=sma, mode='lines', name=f'SMA{period}'))
     fig.update_layout(title='价格走势', xaxis_rangeslider_visible=False)
     st.plotly_chart(fig, use_container_width=True)
 
 def plot_rsi_chart(indicators):
-    rsi_data = indicators.get('RSI', pd.Series())
+    rsi_data = indicators.get('RSI', pd.Series(dtype=float))
     if rsi_data.empty: return
     fig = go.Figure(go.Scatter(x=rsi_data.index, y=rsi_data, name='RSI'))
     fig.add_hline(y=70, line_dash="dash", line_color="red")
@@ -421,7 +449,7 @@ def plot_rsi_chart(indicators):
 
 def plot_macd_chart(indicators):
     macd_data = indicators.get('MACD', {})
-    if not macd_data: return
+    if not macd_data or macd_data.get('macd') is None or macd_data.get('macd').empty: return
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=macd_data['macd'].index, y=macd_data['macd'], name='MACD'))
     fig.add_trace(go.Scatter(x=macd_data['signal'].index, y=macd_data['signal'], name='Signal'))
@@ -431,7 +459,7 @@ def plot_macd_chart(indicators):
 
 def plot_bollinger_chart(data, indicators):
     bb = indicators.get('Bollinger_Bands', {})
-    if not bb: return
+    if not bb or data is None or data.empty: return
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=data.index, y=data['Close'], name='收盘价'))
     fig.add_trace(go.Scatter(x=data.index, y=bb['upper'], name='上轨', line=dict(dash='dash')))
@@ -441,51 +469,67 @@ def plot_bollinger_chart(data, indicators):
     st.plotly_chart(fig, use_container_width=True)
 
 def plot_sma_chart(data, indicators):
+    if data is None or data.empty: return
     fig = go.Figure(go.Scatter(x=data.index, y=data['Close'], name='收盘价', opacity=0.7))
-    for period, sma in indicators.get('SMA', {}).items():
-        fig.add_trace(go.Scatter(x=data.index, y=sma, mode='lines', name=f'SMA{period}'))
+    sma_indicators = indicators.get('SMA', {})
+    if sma_indicators:
+        for period, sma in sma_indicators.items():
+            fig.add_trace(go.Scatter(x=data.index, y=sma, mode='lines', name=f'SMA{period}'))
     fig.update_layout(title='移动平均线')
     st.plotly_chart(fig, use_container_width=True)
 
 def plot_volume_chart(data):
+    if data is None or data.empty: return
     fig = go.Figure(go.Bar(x=data.index, y=data['Volume'], name='成交量'))
     fig.update_layout(title='成交量')
     st.plotly_chart(fig, use_container_width=True)
 
 def plot_atr_chart(indicators):
-    atr_data = indicators.get('ATR', pd.Series())
+    atr_data = indicators.get('ATR', pd.Series(dtype=float))
     if atr_data.empty: return
     fig = go.Figure(go.Scatter(x=atr_data.index, y=atr_data, name='ATR'))
     fig.update_layout(title='ATR (真实波幅)')
     st.plotly_chart(fig, use_container_width=True)
 
 def plot_equity_curve(equity_curve):
+    if equity_curve is None or equity_curve.empty: return
     fig = go.Figure(go.Scatter(x=equity_curve.index, y=equity_curve['equity'], name='资金曲线'))
     fig.update_layout(title='资金曲线')
     st.plotly_chart(fig, use_container_width=True)
 
 def plot_portfolio_pie(df):
+    if df is None or df.empty: return
     fig = go.Figure(go.Pie(labels=df['代码'], values=df['市值'], hole=0.3))
     fig.update_layout(title='持仓分布')
     st.plotly_chart(fig, use_container_width=True)
 
 def display_technical_details(indicators):
     details = []
-    if 'RSI' in indicators:
-        rsi = indicators['RSI'].iloc[-1]
+    
+    rsi_series = indicators.get('RSI', pd.Series(dtype=float))
+    if not rsi_series.empty:
+        rsi = rsi_series.iloc[-1]
         status = '超买' if rsi > 70 else '超卖' if rsi < 30 else '中性'
         details.append(['RSI', f'{rsi:.2f}', status])
-    if 'MACD' in indicators:
-        macd = indicators['MACD']['macd'].iloc[-1]
-        sig = indicators['MACD']['signal'].iloc[-1]
+
+    macd_data = indicators.get('MACD', {})
+    if macd_data and not macd_data.get('macd', pd.Series(dtype=float)).empty:
+        macd = macd_data['macd'].iloc[-1]
+        sig = macd_data['signal'].iloc[-1]
         status = '看涨' if macd > sig else '看跌'
         details.append(['MACD', f'{macd:.2f}', status])
-    if 'SMA' in indicators:
-        sma5 = indicators['SMA'].get('SMA_5', pd.Series([np.nan])).iloc[-1]
-        sma20 = indicators['SMA'].get('SMA_20', pd.Series([np.nan])).iloc[-1]
-        if not pd.isna(sma5) and not pd.isna(sma20):
-            status = '上升' if sma5 > sma20 else '下降'
-            details.append(['趋势', f'{sma5:.2f}/{sma20:.2f}', status])
+
+    sma_data = indicators.get('SMA', {})
+    if sma_data:
+        sma5_series = sma_data.get('SMA_5', pd.Series(dtype=float))
+        sma20_series = sma_data.get('SMA_20', pd.Series(dtype=float))
+        if not sma5_series.empty and not sma20_series.empty:
+            sma5 = sma5_series.iloc[-1]
+            sma20 = sma20_series.iloc[-1]
+            if not pd.isna(sma5) and not pd.isna(sma20):
+                status = '上升' if sma5 > sma20 else '下降'
+                details.append(['趋势', f'{sma5:.2f}/{sma20:.2f}', status])
+    
     if details:
         df = pd.DataFrame(details, columns=['指标','最新值','状态'])
         st.dataframe(df, hide_index=True, use_container_width=True)

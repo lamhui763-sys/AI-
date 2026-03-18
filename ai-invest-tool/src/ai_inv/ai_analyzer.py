@@ -1,380 +1,154 @@
-"""
-AI分析模块
-集成多種AI工具（Gemini、ChatGPT等）提供智能投資分析
-"""
+'''
+AI分析器模块 - 使用Google Gemini Pro
+'''
 
+import google.generativeai as genai
 import os
-import json
-import logging
-from typing import Dict, List, Optional, Union
-from datetime import datetime
 import pandas as pd
+import json
+import re
+import logging
 
+# 引入streamlit以访问secrets
 try:
-    import google.generativeai as genai
-    GEMINI_AVAILABLE = True
+    import streamlit as st
 except ImportError:
-    GEMINI_AVAILABLE = False
-
-try:
-    import openai
-    OPENAI_AVAILABLE = True
-except ImportError:
-    OPENAI_AVAILABLE = False
+    st = None
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
 class AIAnalyzer:
-    """AI分析器 - 集成多種AI工具進行投資分析"""
-    
-    def __init__(self, config: Optional[Dict] = None):
+    """
+    使用Google Gemini Pro进行AI股票分析。
+    """
+    def __init__(self, api_key: str = None):
         """
-        初始化AI分析器
-        
-        Args:
-            config: 配置字典，包含API密鑰等
+        初始化AI分析器。
+        优先使用传入的api_key，否则从环境变量或Streamlit secrets中查找。
         """
-        self.config = config or {}
-        self.logger = logger
-        
-        # 從配置中獲取API密鑰
-        self.gemini_api_key = self.config.get('gemini_api_key') or os.getenv('GEMINI_API_KEY')
-        self.openai_api_key = self.config.get('openai_api_key') or os.getenv('OPENAI_API_KEY')
-        
-        self.openai_model = self.config.get('openai_model', 'gpt-4')
-        self.gemini_model_name = self.config.get('gemini_model', 'gemini-1.5-flash')
-        
-        # 優先使用 Gemini
-        self.use_gemini = bool(self.gemini_api_key and GEMINI_AVAILABLE)
-        
-        # 初始化AI客戶端
-        self.openai_client = None
-        self.gemini_model = None
-        
-        if self.use_gemini:
-            self._init_gemini()
-        else:
-            self._init_openai()
-    
-    def _init_gemini(self):
-        """初始化Gemini客戶端"""
-        if self.gemini_api_key and GEMINI_AVAILABLE:
-            try:
-                genai.configure(api_key=self.gemini_api_key)
-                self.gemini_model = genai.GenerativeModel(self.gemini_model_name)
-                self.logger.info(f"Gemini客戶端初始化成功 (模型: {self.gemini_model_name})")
-            except Exception as e:
-                self.logger.error(f"Gemini客戶端初始化失敗: {e}")
-                self.use_gemini = False
-                self._init_openai()
-    
-    def _init_openai(self):
-        """初始化OpenAI客戶端"""
-        if self.openai_api_key and OPENAI_AVAILABLE:
-            try:
-                openai.api_key = self.openai_api_key
-                self.openai_client = openai
-                self.logger.info("OpenAI客戶端初始化成功")
-            except Exception as e:
-                self.logger.error(f"OpenAI客戶端初始化失敗: {e}")
-        else:
-            if not self.openai_api_key and not self.gemini_api_key:
-                self.logger.warning("未提供任何 AI API 密鑰")
-    
-    def _call_ai(self, prompt: str, temperature: float = 0.7) -> str:
-        """統一調用 AI 接口"""
-        if self.use_gemini and self.gemini_model:
-            return self._call_gemini(prompt, temperature)
-        elif self.openai_client:
-            return self._call_openai(prompt, temperature)
-        else:
-            self.logger.warning("AI客戶端未初始化，返回模擬響應")
-            return self._get_mock_response(prompt)
-
-    def _call_gemini(self, prompt: str, temperature: float = 0.7) -> str:
-        """調用 Gemini API"""
         try:
-            response = self.gemini_model.generate_content(
-                prompt,
-                generation_config=genai.types.GenerationConfig(
-                    temperature=temperature,
-                    max_output_tokens=2048,
-                )
-            )
-            return response.text
-        except Exception as e:
-            self.logger.error(f"調用 Gemini API 失敗: {e}")
-            if self.openai_client:
-                return self._call_openai(prompt, temperature)
-            return self._get_mock_response(prompt)
-
-    def _call_openai(self, prompt: str, temperature: float = 0.7) -> str:
-        """調用 OpenAI API"""
-        try:
-            # 兼容新舊版本 OpenAI SDK
-            if hasattr(self.openai_client, 'ChatCompletion'):
-                response = self.openai_client.ChatCompletion.create(
-                    model=self.openai_model,
-                    messages=[
-                        {"role": "system", "content": "你是一位專業的港股分析師和投資顧問。"},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=temperature,
-                    max_tokens=1500
-                )
-                return response.choices[0].message.content
-            else:
-                # 假設是新版 SDK
-                from openai import OpenAI
-                client = OpenAI(api_key=self.openai_api_key)
-                response = client.chat.completions.create(
-                    model=self.openai_model,
-                    messages=[
-                        {"role": "system", "content": "你是一位專業的港股分析師和投資顧問。"},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=temperature,
-                )
-                return response.choices[0].message.content
-        except Exception as e:
-            self.logger.error(f"調用 OpenAI API 失敗: {e}")
-            return self._get_mock_response(prompt)
-
-    def analyze_stock_with_ai(self, symbol: str, technical_data: Dict, 
-                               market_news: Optional[List[Dict]] = None) -> Dict:
-        """使用AI分析股票"""
-        self.logger.info(f"開始AI分析股票: {symbol}")
-        prompt = self._build_analysis_prompt(symbol, technical_data, market_news)
-        ai_response = self._call_ai(prompt)
-        return self._parse_ai_response(ai_response)
-    
-    def get_investment_advice(self, symbol: str, technical_data: Dict,
-                               portfolio_data: Optional[Dict] = None) -> Dict:
-        """獲取投資建議"""
-        self.logger.info(f"獲取投資建議: {symbol}")
-        prompt = self._build_investment_prompt(symbol, technical_data, portfolio_data)
-        ai_response = self._call_ai(prompt)
-        return self._parse_investment_advice(ai_response)
-    
-    def generate_report(self, symbol: str, technical_data: Dict,
-                       ai_analysis: Dict, news: Optional[List[Dict]] = None) -> str:
-        """生成綜合分析報告"""
-        prompt = self._build_report_prompt(symbol, technical_data, ai_analysis, news)
-        return self._call_ai(prompt)
-    
-    def explain_indicator(self, indicator_name: str, value: float,
-                         context: Optional[str] = None) -> str:
-        """解釋技術指標"""
-        prompt = f"""
-請解釋以下技術指標的當前狀態和含義：
-
-指標名稱: {indicator_name}
-當前值: {value}
-上下文: {context if context else '無'}
-
-請用簡潔明了的語言解釋：
-1. 這個指標的含義
-2. 當前值的含義
-3. 對投資的啟示
-4. 風險提示
-
-請用繁體中文回答。
-"""
-        return self._call_ai(prompt)
-    
-    def compare_stocks(self, stocks_data: Dict[str, Dict]) -> Dict:
-        """比較多隻股票"""
-        self.logger.info(f"比較 {len(stocks_data)} 只股票")
-        prompt = self._build_comparison_prompt(stocks_data)
-        comparison = self._call_ai(prompt)
-        return self._parse_comparison(comparison)
-    
-    def sentiment_analysis(self, text: str) -> Dict:
-        """情感分析"""
-        prompt = f"""
-請對以下文本進行情感分析：
-
-文本內容: {text}
-
-請分析：
-1. 整體情感（正面/負面/中性）
-2. 情感強度（1-10分）
-3. 關鍵情感詞
-4. 對投資的啟示
-
-請以JSON格式返回，使用繁體中文。
-"""
-        response = self._call_ai(prompt)
-        return self._parse_json_response(response)
-    
-    def generate_trading_plan(self, symbol: str, analysis: Dict,
-                              risk_tolerance: str = 'medium') -> Dict:
-        """生成交易計劃"""
-        prompt = self._build_trading_plan_prompt(symbol, analysis, risk_tolerance)
-        plan = self._call_ai(prompt)
-        return self._parse_trading_plan(plan)
-    
-    def _build_analysis_prompt(self, symbol: str, technical_data: Dict,
-                                news: Optional[List[Dict]] = None) -> str:
-        """構建分析提示"""
-        prompt = f"""
-你是一位專業的港股分析師。請分析以下股票：
-
-股票代碼: {symbol}
-
-技術指標數據:
-{json.dumps(technical_data, ensure_ascii=False, indent=2)}
-"""
-        if news:
-            prompt += "\n市場新聞:\n"
-            for item in news:
-                prompt += f"- {item.get('title', '')}: {item.get('summary', '')}\n"
-        
-        prompt += """
-請提供以下分析：
-1. 技面分析（基於技術指標）
-2. 趨勢判斷
-3. 風險評估
-4. 操作建議（買入/持有/賣出）
-5. 目標價位（如有）
-6. 止損價位（如有）
-
-請以JSON格式返回，使用繁體中文。
-"""
-        return prompt
-    
-    def _build_investment_prompt(self, symbol: str, technical_data: Dict,
-                                  portfolio_data: Optional[Dict] = None) -> str:
-        """構建投資建議提示"""
-        prompt = f"""
-你是一位投資顧問。請為以下股票提供投資建議：
-
-股票代碼: {symbol}
-
-技術分析:
-{json.dumps(technical_data, ensure_ascii=False, indent=2)}
-"""
-        if portfolio_data:
-            prompt += f"\n當前投資組合:\n{json.dumps(portfolio_data, ensure_ascii=False, indent=2)}\n"
-        
-        prompt += """
-請提供：
-1. 是否建議投資（是/否/觀望）
-2. 建議倉位比例
-3. 買入時機
-4. 風險提示
-5. 投資理由
-
-請以JSON格式返回，使用繁體中文。
-"""
-        return prompt
-    
-    def _build_report_prompt(self, symbol: str, technical_data: Dict,
-                             ai_analysis: Dict, news: Optional[List[Dict]] = None) -> str:
-        """構建報告提示"""
-        prompt = f"""
-請為以下股票生成一份專業的投資分析報告：
-
-股票代碼: {symbol}
-
-技術指標:
-{json.dumps(technical_data, ensure_ascii=False, indent=2)}
-
-AI分析:
-{json.dumps(ai_analysis, ensure_ascii=False, indent=2)}
-"""
-        if news:
-            prompt += "\n相關新聞:\n"
-            for item in news:
-                prompt += f"- {item.get('title', '')}\n"
-        
-        prompt += """
-請生成一份結構清晰、內容專業的投資分析報告，包含：
-1. 報告摘要
-2. 技術面分析
-3. 風險評估
-4. 投資建議
-5. 結論
-
-請使用繁體中文，格式清晰易讀。
-"""
-        return prompt
-    
-    def _build_comparison_prompt(self, stocks_data: Dict[str, Dict]) -> str:
-        """構建比較提示"""
-        prompt = "請比較以下股票的技术指標和投資價值：\n\n"
-        for symbol, data in stocks_data.items():
-            prompt += f"{symbol}:\n"
-            prompt += f"{json.dumps(data, ensure_ascii=False, indent=2)}\n\n"
-        
-        prompt += """
-請提供：
-1. 各股票的優勢和劣勢
-2. 投資價值排名
-3. 不同投資風格的選擇建議
-
-請以JSON格式返回，使用繁體中文。
-"""
-        return prompt
-    
-    def _build_trading_plan_prompt(self, symbol: str, analysis: Dict,
-                                    risk_tolerance: str) -> str:
-        """構建交易計劃提示"""
-        prompt = f"""
-請為以下股票制定詳細的交易計劃：
-
-股票代碼: {symbol}
-風險承受能力: {risk_tolerance}
-
-分析數據:
-{json.dumps(analysis, ensure_ascii=False, indent=2)}
-
-請提供詳細的交易計劃：
-1. 入場點位
-2. 止損點位
-3. 目標價位
-4. 倉位管理
-5. 時間週期
-6. 風險控制措施
-
-請以JSON格式返回，使用繁體中文。
-"""
-        return prompt
-    
-    def _parse_ai_response(self, response: str) -> Dict:
-        """解析AI響應"""
-        return self._parse_json_response(response)
-    
-    def _parse_investment_advice(self, response: str) -> Dict:
-        """解析投資建議"""
-        return self._parse_json_response(response)
-    
-    def _parse_comparison(self, response: str) -> Dict:
-        """解析比較結果"""
-        return self._parse_json_response(response)
-    
-    def _parse_trading_plan(self, response: str) -> Dict:
-        """解析交易計劃"""
-        return self._parse_json_response(response)
-    
-    def _parse_json_response(self, response: str) -> Dict:
-        """解析JSON響應"""
-        try:
-            # 尋找 JSON 塊
-            if "```json" in response:
-                json_str = response.split("```json")[1].split("```")[0].strip()
-            elif "```" in response:
-                json_str = response.split("```")[1].split("```")[0].strip()
-            else:
-                json_str = response.strip()
+            # 优先从Streamlit secrets获取（在Streamlit Cloud环境中）
+            if st and hasattr(st, 'secrets') and "GEMINI_API_KEY" in st.secrets:
+                api_key = st.secrets["GEMINI_API_KEY"]
             
-            return json.loads(json_str)
+            # 否则，从环境变量获取
+            if not api_key:
+                api_key = os.environ.get("GEMINI_API_KEY")
+
+            if not api_key:
+                raise ValueError("Gemini API Key not found. Please set it in st.secrets or as an environment variable.")
+
+            genai.configure(api_key=api_key)
+            self.model = genai.GenerativeModel('gemini-pro')
+            logger.info("AIAnalyzer initialized successfully.")
         except Exception as e:
-            self.logger.error(f"解析JSON響應失敗: {e}")
-            return {"error": "解析失敗", "raw_response": response}
-    
-    def _get_mock_response(self, prompt: str) -> str:
-        """獲取模擬響應（當 API 不可用時）"""
-        return "AI 分析暫不可用，請檢查 API 密鑰配置。"
+            logger.error(f"Error initializing AIAnalyzer: {e}")
+            # 重新引发异常，以便UI可以捕获并显示它
+            raise e
+
+    def _create_prompt(self, symbol: str, technical_data: pd.DataFrame) -> str:
+        """
+        根据最新的技术数据创建详细的AI分析提示。
+        """
+        # 提取最新的技术指标
+        latest_indicators = technical_data.iloc[-1]
+        
+        summary = f"股票代码: {symbol}\n"
+        summary += "最新技术指标:\n"
+        
+        # 安全地提取关键指标
+        rsi = latest_indicators.get('RSI')
+        if rsi is not None and not pd.isna(rsi):
+            summary += f"- RSI(14): {rsi:.2f}\n"
+
+        macd = latest_indicators.get('MACD')
+        macd_signal = latest_indicators.get('MACD_signal')
+        if macd is not None and macd_signal is not None and not pd.isna(macd):
+            summary += f"- MACD: {macd:.2f} (信号线: {macd_signal:.2f})\n"
+            if macd > macd_signal:
+                summary += "  - 状态: 看涨 (金叉趋势)\n"
+            else:
+                summary += "  - 状态: 看跌 (死叉趋势)\n"
+        
+        # 提取SMA趋势
+        sma_cols = sorted([col for col in technical_data.columns if col.startswith('SMA_')])
+        if len(sma_cols) >= 2:
+            short_sma_col = sma_cols[0]
+            long_sma_col = sma_cols[-1]
+            short_sma = latest_indicators.get(short_sma_col)
+            long_sma = latest_indicators.get(long_sma_col)
+            if short_sma is not None and long_sma is not None and not pd.isna(short_sma):
+                summary += f"- 移动平均线: 短期({short_sma_col}) = {short_sma:.2f}, 长期({long_sma_col}) = {long_sma:.2f}\n"
+                if short_sma > long_sma:
+                    summary += "  - 趋势: 上升趋势 (黄金交叉)\n"
+                else:
+                    summary += "  - 趋势: 下降趋势 (死亡交叉)\n"
+        
+        latest_close = latest_indicators.get('Close')
+        if latest_close:
+            summary += f"- 最新收盘价: {latest_close:.2f}\n"
+
+        prompt = f"""
+        你是一位专业的金融分析师。基于以下为股票 {symbol} 提供的最新技术分析数据，请提供一份简洁、专业的投资分析报告。
+
+        **技术数据摘要:**
+        {summary}
+
+        **你的任务:**
+        1.  **投资建议 (recommendation):** 基于以上数据，明确给出你的投资建议。选项必须是以下之一：'强烈买入', '买入', '持有', '卖出', '强烈卖出'。
+        2.  **分析 (analysis):** 提供一个简洁的分析，解释你为什么会给出这个建议。分析应结合提供的技术指标（如RSI状态、MACD交叉、移动平均线趋势等）来支持你的观点。
+
+        **输出格式要求:**
+        请严格按照以下JSON格式返回你的分析，不要添加任何额外的解释或标记。
+
+        {{ "recommendation": "你的建议", "analysis": "你的分析内容" }}
+        """
+        logger.info(f"Generated prompt for {symbol}")
+        return prompt
+
+    def _parse_response(self, response_text: str) -> dict:
+        """
+        从AI的响应中解析出JSON对象。
+        """
+        logger.info(f"Raw AI response: {response_text}")
+        # 使用正则表达式去除 ```json ... ``` 等标记
+        match = re.search(r'\{.*\}', response_text, re.DOTALL)
+        if match:
+            json_str = match.group(0)
+            try:
+                return json.loads(json_str)
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to decode JSON from AI response: {e}\nResponse text: {json_str}")
+                return {"error": "AI返回了无效的格式"}
+        else:
+            logger.error(f"No JSON object found in AI response: {response_text}")
+            return {"error": "AI未能生成有效的分析"}
+
+    def analyze_stock_with_ai(self, symbol: str, technical_data: pd.DataFrame) -> dict:
+        """
+        使用AI分析股票。
+
+        Args:
+            symbol: 股票代码。
+            technical_data: 包含技术指标的DataFrame。
+
+        Returns:
+            一个包含分析结果的字典，或包含错误信息的字典。
+        """
+        if technical_data is None or technical_data.empty:
+            return {"error": "技术数据为空，无法进行AI分析"}
+
+        try:
+            prompt = self._create_prompt(symbol, technical_data)
+            
+            # 调用Gemini API
+            response = self.model.generate_content(prompt)
+            
+            # 解析响应
+            result = self._parse_response(response.text)
+            return result
+
+        except Exception as e:
+            logger.error(f"An exception occurred during AI analysis for {symbol}: {e}", exc_info=True)
+            return {"error": f"AI分析服务出现意外错误: {str(e)}"}

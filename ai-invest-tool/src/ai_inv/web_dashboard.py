@@ -21,7 +21,7 @@ from src.ai_inv.backtester import BacktestEngine, MAStrategy, RSIStrategy, MACDS
 from src.ai_inv.data_fetcher import DataFetcher
 from src.ai_inv.indicators import TechnicalIndicators # 确保导入
 
-# --- 绘图函数 (重构后，只接收一个DataFrame) ---
+# --- 绘图函数 (已修正数据列名称不匹配问题) ---
 
 def plot_price_chart(data):
     if data is None or data.empty: return
@@ -29,34 +29,51 @@ def plot_price_chart(data):
     sma_cols = [col for col in data.columns if 'SMA' in col]
     for col in sma_cols:
         fig.add_trace(go.Scatter(x=data.index, y=data[col], mode='lines', name=col.replace('_', ' ')))
-    fig.update_layout(title='价格走势', xaxis_rangeslider_visible=False)
+    fig.update_layout(title='价格与移动平均线', xaxis_rangeslider_visible=False)
     st.plotly_chart(fig, use_container_width=True)
 
 def plot_rsi_chart(data):
-    if data is None or 'RSI' not in data.columns or data['RSI'].dropna().empty: return
-    fig = go.Figure(go.Scatter(x=data.index, y=data['RSI'], name='RSI'))
+    if data is None: return
+    # 修正: 动态查找RSI列 (例如 RSI_14)
+    rsi_col = next((col for col in data.columns if col.startswith('RSI_')), None)
+    if rsi_col is None or data[rsi_col].dropna().empty: return
+    
+    fig = go.Figure(go.Scatter(x=data.index, y=data[rsi_col], name='RSI'))
     fig.add_hline(y=70, line_dash="dash", line_color="red", annotation_text="超买")
     fig.add_hline(y=30, line_dash="dash", line_color="green", annotation_text="超卖")
     fig.update_layout(title='RSI 指标', yaxis_range=[0,100])
     st.plotly_chart(fig, use_container_width=True)
 
 def plot_macd_chart(data):
-    if data is None or not all(k in data.columns for k in ['MACD', 'MACD_signal', 'MACD_hist']): return
+    # 修正: 使用正确的大写列名 MACD_Signal 和 MACD_Histogram
+    if data is None or not all(k in data.columns for k in ['MACD', 'MACD_Signal', 'MACD_Histogram']): return
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=data.index, y=data['MACD'], name='MACD', line_color='#1f77b4'))
-    fig.add_trace(go.Scatter(x=data.index, y=data['MACD_signal'], name='Signal', line_color='#ff7f0e'))
-    colors = ['#2ca02c' if v >= 0 else '#d62728' for v in data['MACD_hist']]
-    fig.add_trace(go.Bar(x=data.index, y=data['MACD_hist'], name='Histogram', marker_color=colors))
+    fig.add_trace(go.Scatter(x=data.index, y=data['MACD_Signal'], name='Signal', line_color='#ff7f0e'))
+    colors = ['#2ca02c' if v >= 0 else '#d62728' for v in data['MACD_Histogram']]
+    fig.add_trace(go.Bar(x=data.index, y=data['MACD_Histogram'], name='Histogram', marker_color=colors))
     fig.update_layout(title='MACD 指标')
     st.plotly_chart(fig, use_container_width=True)
 
 def plot_bollinger_chart(data):
-    if data is None or not all(k in data.columns for k in ['BB_upper', 'BB_middle', 'BB_lower']): return
+    # 修正: 使用正确的大写列名 BB_Upper, BB_Middle, BB_Lower
+    if data is None or not all(k in data.columns for k in ['BB_Upper', 'BB_Middle', 'BB_Lower']): return
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=data.index, y=data['Close'], name='收盘价', line_color='blue'))
-    fig.add_trace(go.Scatter(x=data.index, y=data['BB_upper'], name='上轨', line=dict(dash='dash', color='gray')))
-    fig.add_trace(go.Scatter(x=data.index, y=data['BB_middle'], name='中轨', line=dict(color='gray', width=1.5)))
-    fig.add_trace(go.Scatter(x=data.index, y=data['BB_lower'], name='下轨', line=dict(dash='dash', color='gray')))
+    # 增加K线或收盘价，使布林带更有上下文
+    fig.add_trace(go.Scatter(x=data.index, y=data['Close'], name='收盘价', line=dict(color='rgba(0,0,100,0.6)')))
+    fig.add_trace(go.Scatter(x=data.index, y=data['BB_Upper'], name='上轨', line=dict(dash='dash', color='gray')))
+    fig.add_trace(go.Scatter(x=data.index, y=data['BB_Middle'], name='中轨', line=dict(color='darkorange', width=1.5)))
+    fig.add_trace(go.Scatter(x=data.index, y=data['BB_Lower'], name='下轨', line=dict(dash='dash', color='gray')))
+    # 填充布林带区域，使其更美观
+    fig.add_trace(go.Scatter(
+        x=data.index, y=data['BB_Upper'],
+        fill=None, mode='lines', line_color='rgba(255,255,255,0)', showlegend=False
+    ))
+    fig.add_trace(go.Scatter(
+        x=data.index, y=data['BB_Lower'],
+        fill='tonexty', mode='lines', line_color='rgba(255,255,255,0)',
+        fillcolor='rgba(128,128,128,0.2)', showlegend=False
+    ))
     fig.update_layout(title='布林带')
     st.plotly_chart(fig, use_container_width=True)
 
@@ -68,7 +85,7 @@ def plot_volume_chart(data):
 
 def plot_equity_curve(equity_curve):
     if equity_curve is None or equity_curve.empty: return
-    fig = go.Figure(go.Scatter(x=equity_curve.index, y=equity_curve['equity'], name='资金曲线'))
+    fig = go.Figure(go.Scatter(x=equity_curve['date'], y=equity_curve['portfolio_value'], name='资金曲线'))
     fig.update_layout(title='资金曲线', yaxis_title='资产净值')
     st.plotly_chart(fig, use_container_width=True)
 
@@ -80,11 +97,12 @@ def plot_portfolio_pie(df):
 def display_technical_details(data):
     details = []
     if data is None or data.empty: return
-    if 'RSI' in data.columns and not data['RSI'].dropna().empty:
-        rsi = data['RSI'].iloc[-1]
+    rsi_col = next((col for col in data.columns if col.startswith('RSI_')), None)
+    if rsi_col and not data[rsi_col].dropna().empty:
+        rsi = data[rsi_col].iloc[-1]
         if not pd.isna(rsi): details.append(['RSI', f'{rsi:.2f}', '超买' if rsi > 70 else '超卖' if rsi < 30 else '中性'])
-    if all(k in data.columns for k in ['MACD', 'MACD_signal']) and not data['MACD'].dropna().empty:
-        macd, sig = data['MACD'].iloc[-1], data['MACD_signal'].iloc[-1]
+    if all(k in data.columns for k in ['MACD', 'MACD_Signal']) and not data['MACD'].dropna().empty:
+        macd, sig = data['MACD'].iloc[-1], data['MACD_Signal'].iloc[-1]
         if not pd.isna(macd) and not pd.isna(sig): details.append(['MACD', f'{macd:.2f}', '看涨 (金叉)' if macd > sig else '看跌 (死叉)'])
     sma_cols = sorted([col for col in data.columns if col.startswith('SMA_')])
     if len(sma_cols) >= 2:
@@ -112,9 +130,11 @@ def stock_analysis_page():
             results = []
             for symbol in symbols:
                 try:
-                    indicators_df = analyzer.analyze_stock(symbol, period=period)
-                    if indicators_df is not None and not indicators_df.empty:
-                        signal = analyzer.get_trading_signal(indicators_df)
+                    # 使用 calculate_all_indicators 来确保所有指标都已计算
+                    data = DataFetcher().get_historical_data(symbol, period=period)
+                    if data is not None and not data.empty:
+                        indicators_df = TechnicalIndicators().calculate_all_indicators(data)
+                        signal = analyzer.get_trading_signal(indicators_df) # TechnicalAnalyzer 里的方法
                         results.append({'symbol': symbol, 'indicators_df': indicators_df, 'signal': signal, 'error': None})
                     else:
                         results.append({'symbol': symbol, 'indicators_df': None, 'signal': None, 'error': "无法获取或分析数据"})
@@ -146,11 +166,16 @@ def stock_analysis_page():
                 
                 st.divider()
                 st.subheader("图表分析")
+                # 修正: 添加所有图表调用
                 plot_price_chart(indicators_df)
+                plot_bollinger_chart(indicators_df)
+                plot_volume_chart(indicators_df)
                 c1, c2 = st.columns(2)
                 with c1: plot_rsi_chart(indicators_df)
                 with c2: plot_macd_chart(indicators_df)
-                with st.expander("📋 详细技术指标"): display_technical_details(indicators_df)
+
+                with st.expander("📋 详细技术指标"):
+                    display_technical_details(indicators_df)
 
 def technical_analysis_page():
     st.header("🔬 技术分析")
@@ -177,11 +202,12 @@ def technical_analysis_page():
 
     if 'tech_indicators_df' in st.session_state and st.session_state.tech_indicators_df is not None:
         df = st.session_state.tech_indicators_df
-        plot_price_chart(df) if show_sma else None
-        plot_rsi_chart(df) if show_rsi else None
-        plot_macd_chart(df) if show_macd else None
-        plot_bollinger_chart(df) if show_bollinger else None
-        plot_volume_chart(df) if show_volume else None
+        # 修正: 确保在显示之前数据存在
+        if show_sma: plot_price_chart(df)
+        if show_bollinger: plot_bollinger_chart(df)
+        if show_rsi: plot_rsi_chart(df)
+        if show_macd: plot_macd_chart(df)
+        if show_volume: plot_volume_chart(df)
 
 def ai_analysis_page():
     st.header("🤖 AI分析")
@@ -193,10 +219,10 @@ def ai_analysis_page():
         st.session_state.pop('ai_result', None)
         with st.spinner("AI正在分析中..."):
             try:
-                tech_analyzer = TechnicalAnalyzer()
-                technical_data = tech_analyzer.analyze_stock(symbol, period='1y')
-                
-                if technical_data is not None and not technical_data.empty:
+                # AI分析也需要完整的技术指标
+                data = DataFetcher().get_historical_data(symbol, period='1y')
+                if data is not None and not data.empty:
+                    technical_data = TechnicalIndicators().calculate_all_indicators(data)
                     ai_analyzer = AIAnalyzer()
                     st.session_state.ai_result = ai_analyzer.analyze_stock_with_ai(symbol, technical_data)
                 else:
@@ -209,7 +235,6 @@ def ai_analysis_page():
     if 'ai_result' in st.session_state and st.session_state.ai_result:
         res = st.session_state.ai_result
         st.subheader("AI分析结果")
-        # 检查是否有错误，并显示
         if "error" in res and res["error"]:
             st.error(f"分析失败: {res['error']}")
         else:
@@ -220,9 +245,23 @@ def backtest_page():
     st.header("⏱️ 回测引擎")
     st.sidebar.subheader("回测配置")
     strategy_type = st.sidebar.selectbox("选择策略", ["移动平均交叉", "RSI", "MACD"])
-    if strategy_type == "移动平均交叉": strategy = MAStrategy(st.sidebar.number_input("短期均线", value=5), st.sidebar.number_input("长期均线", value=20))
-    elif strategy_type == "RSI": strategy = RSIStrategy(st.sidebar.number_input("RSI周期", value=14), st.sidebar.number_input("超卖线", value=30), st.sidebar.number_input("超买线", value=70))
-    else: strategy = MACDStrategy(st.sidebar.number_input("快线周期", value=12), st.sidebar.number_input("慢线周期", value=26), st.sidebar.number_input("信号线周期", value=9))
+    if strategy_type == "移动平均交叉": 
+        strategy = MAStrategy(
+            short_period=st.sidebar.number_input("短期均线", value=5, min_value=1),
+            long_period=st.sidebar.number_input("长期均线", value=20, min_value=2)
+        )
+    elif strategy_type == "RSI": 
+        strategy = RSIStrategy(
+            period=st.sidebar.number_input("RSI周期", value=14, min_value=2),
+            oversold=st.sidebar.number_input("超卖线", value=30, min_value=1, max_value=99),
+            overbought=st.sidebar.number_input("超买线", value=70, min_value=1, max_value=99)
+        )
+    else: 
+        strategy = MACDStrategy(
+            fast_period=st.sidebar.number_input("快线周期", value=12, min_value=2),
+            slow_period=st.sidebar.number_input("慢线周期", value=26, min_value=2),
+            signal_period=st.sidebar.number_input("信号线周期", value=9, min_value=1)
+        )
     
     symbol = st.sidebar.text_input("回测股票代码", value="^HSI")
     capital = st.sidebar.number_input("初始资金", value=100000)
@@ -239,6 +278,7 @@ def backtest_page():
         res = st.session_state.backtest_results
         st.subheader(f"{symbol} - {strategy_type}策略回测结果")
         summary = res.get('summary', {})
+        trades_summary = res.get('trades', {})
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("总收益", f"{summary.get('total_return', 0):.2f}%")
         c2.metric("年化收益", f"{summary.get('annual_return', 0):.2f}%")
@@ -247,11 +287,11 @@ def backtest_page():
         if 'equity_curve' in res: plot_equity_curve(res['equity_curve'])
         with st.expander("交易统计与记录"):
             c1, c2 = st.columns(2)
-            c1.metric("总交易数", summary.get('total_trades', 0))
-            c1.metric("胜率", f"{summary.get('win_rate', 0):.2f}%")
-            c2.metric("盈利交易数", summary.get('winning_trades', 0))
-            c2.metric("亏损交易数", summary.get('losing_trades', 0))
-            if 'trades' in res: st.dataframe(res['trades'], use_container_width=True)
+            c1.metric("总交易数", trades_summary.get('total_trades', 0))
+            c1.metric("胜率", f"{trades_summary.get('win_rate', 0):.2f}%")
+            c2.metric("盈利交易数", trades_summary.get('winning_trades', 0))
+            trades_history = res.get('trades_history')
+            if trades_history is not None: st.dataframe(trades_history, use_container_width=True)
 
 def portfolio_page():
     st.header("💼 投资组合分析")

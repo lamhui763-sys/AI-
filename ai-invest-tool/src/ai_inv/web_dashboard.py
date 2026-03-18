@@ -1,5 +1,5 @@
 '''
-Web仪表板模块 - 完整功能恢复版
+Web仪表板模块 - 修正AI分析页面参数错误
 使用Streamlit创建交互式Web界面
 '''
 
@@ -19,9 +19,9 @@ from src.ai_inv.sentiment_analyzer import SentimentAnalyzer
 from src.ai_inv.smart_advisor import SmartAdvisor
 from src.ai_inv.backtester import BacktestEngine, MAStrategy, RSIStrategy, MACDStrategy
 from src.ai_inv.data_fetcher import DataFetcher
-from src.ai_inv.indicators import TechnicalIndicators # 确保导入
+from src.ai_inv.indicators import TechnicalIndicators
 
-# --- 绘图函数 (重构后，只接收一个DataFrame) ---
+# --- 绘图函数 ---
 
 def plot_price_chart(data):
     if data is None or data.empty: return
@@ -192,13 +192,33 @@ def ai_analysis_page():
     if st.button("开始AI分析", type="primary"):
         st.session_state.pop('ai_result', None)
         with st.spinner("AI正在分析中..."):
-            try: st.session_state.ai_result = AIAnalyzer().analyze_stock_with_ai(symbol)
-            except Exception as e: st.error(f"❌ 分析时发生错误: {e}")
+            try:
+                # --- BUG FIX START ---
+                # 1. 获取技术分析数据
+                tech_analyzer = TechnicalAnalyzer()
+                technical_data_df = tech_analyzer.analyze_stock(symbol, period='3mo')
+
+                if technical_data_df is None or technical_data_df.empty:
+                    st.error("无法获取用于AI分析的技术数据。")
+                    return
+                
+                # 2. 将技术数据摘要传递给AI分析器
+                technical_summary = tech_analyzer.get_trading_signal(technical_data_df)
+                ai_analyzer = AIAnalyzer()
+                st.session_state.ai_result = ai_analyzer.analyze_stock_with_ai(symbol, technical_summary)
+                # --- BUG FIX END ---
+
+            except Exception as e:
+                st.error(f"❌ 分析时发生错误: {e}")
     
     if 'ai_result' in st.session_state and st.session_state.ai_result:
         res = st.session_state.ai_result
-        st.subheader("AI分析结果") ; st.metric("AI建议", res.get('recommendation', 'N/A'))
-        st.markdown(res.get('analysis', '分析内容不可用。'))
+        st.subheader("AI分析结果") 
+        if res:
+            st.metric("AI建议", res.get('recommendation', 'N/A'))
+            st.markdown(res.get('analysis', '分析内容不可用。'))
+        else:
+            st.warning("AI分析未返回有效结果。")
 
 def backtest_page():
     st.header("⏱️ 回测引擎")
@@ -244,27 +264,35 @@ def portfolio_page():
         c1, c2, c3 = st.columns(3)
         symbol, shares, price = c1.text_input("代码"), c2.number_input("股数", min_value=1), c3.number_input("成本价", min_value=0.0)
         if st.form_submit_button("添加持仓"):
-            st.session_state.holdings.append({'symbol': symbol, 'shares': shares, 'price': price})
-            st.rerun()
+            if symbol and shares > 0 and price > 0:
+                st.session_state.holdings.append({'symbol': symbol, 'shares': shares, 'price': price})
+                st.rerun()
+            else:
+                st.warning("请输入有效的持仓信息。")
 
     if st.session_state.holdings:
         portfolio_df = pd.DataFrame(st.session_state.holdings)
         fetcher = DataFetcher()
         current_prices = [fetcher.get_current_price(h['symbol']) for h in st.session_state.holdings]
-        portfolio_df['current_price'] = current_prices
-        portfolio_df['cost'] = portfolio_df['shares'] * portfolio_df['price']
-        portfolio_df['market_value'] = portfolio_df['shares'] * portfolio_df['current_price']
-        portfolio_df['pnl'] = portfolio_df['market_value'] - portfolio_df['cost']
-        portfolio_df['pnl_pct'] = (portfolio_df['pnl'] / portfolio_df['cost']) * 100
+        portfolio_df['current_price'] = [p if p is not None else 0 for p in current_prices]
+        portfolio_df = portfolio_df[portfolio_df['current_price'] > 0] # 过滤掉获取价格失败的行
+        
+        if not portfolio_df.empty:
+            portfolio_df['cost'] = portfolio_df['shares'] * portfolio_df['price']
+            portfolio_df['market_value'] = portfolio_df['shares'] * portfolio_df['current_price']
+            portfolio_df['pnl'] = portfolio_df['market_value'] - portfolio_df['cost']
+            portfolio_df['pnl_pct'] = (portfolio_df['pnl'] / portfolio_df['cost']) * 100
 
-        st.subheader("当前持仓")
-        st.dataframe(portfolio_df, hide_index=True, use_container_width=True)
-        total_cost, total_value = portfolio_df['cost'].sum(), portfolio_df['market_value'].sum()
-        c1, c2, c3 = st.columns(3)
-        c1.metric("组合总值", f"${total_value:,.2f}")
-        c2.metric("总盈亏", f"${(total_value - total_cost):,.2f}")
-        c3.metric("总收益率", f"{(total_value/total_cost - 1):.2%}")
-        plot_portfolio_pie(portfolio_df.rename(columns={'symbol':'代码', 'market_value':'市值'}))
+            st.subheader("当前持仓")
+            st.dataframe(portfolio_df, hide_index=True, use_container_width=True)
+            total_cost, total_value = portfolio_df['cost'].sum(), portfolio_df['market_value'].sum()
+            if total_cost > 0:
+                c1, c2, c3 = st.columns(3)
+                c1.metric("组合总值", f"${total_value:,.2f}")
+                c2.metric("总盈亏", f"${(total_value - total_cost):,.2f}")
+                c3.metric("总收益率", f"{(total_value/total_cost - 1):.2%}")
+                plot_portfolio_pie(portfolio_df.rename(columns={'symbol':'代码', 'market_value':'市值'}))
+        
         if st.button("清空持仓"): st.session_state.holdings = []; st.rerun()
 
 def news_analysis_page():

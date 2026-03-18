@@ -1,4 +1,4 @@
-'"""
+"""
 Web仪表板模块
 使用Streamlit创建交互式Web界面
 
@@ -8,7 +8,7 @@ Web仪表板模块
 - 交互式图表
 - AI分析结果展示
 - 回测结果可视化
-"""'
+"""
 
 import streamlit as st
 import pandas as pd
@@ -398,7 +398,7 @@ def news_analysis_page():
                     c3.metric("置信度", f"{result['confidence']:.1%}")
                     
                     if result.get('keywords'):
-                        st.write("**关键词:** " + " | ".join(result['keywords'])
+                        st.write("**关键词:** " + " | ".join(result['keywords']))
                 except Exception as e:
                     st.error(f"❌ 分析时发生错误: {e}")
 

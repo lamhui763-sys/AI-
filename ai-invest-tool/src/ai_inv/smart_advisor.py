@@ -9,7 +9,7 @@ from datetime import datetime
 import json
 
 from .technical_analyzer import TechnicalAnalyzer
-from .ai_analyzer import AIAnalyzer, HybridAIAnalyzer
+from .ai_analyzer import AIAnalyzer
 from .sentiment_analyzer import SentimentAnalyzer, NewsSentimentAnalyzer
 
 logging.basicConfig(level=logging.INFO)
@@ -32,7 +32,7 @@ class SmartAdvisor:
         # 初始化各个分析器
         self.technical_analyzer = TechnicalAnalyzer(config)
         self.ai_analyzer = AIAnalyzer(config)
-        self.hybrid_analyzer = HybridAIAnalyzer(config)
+        self.hybrid_analyzer = self.ai_analyzer  # 保持兼容性，指向同一個實例
         self.sentiment_analyzer = SentimentAnalyzer(config)
         self.news_analyzer = NewsSentimentAnalyzer(config)
     

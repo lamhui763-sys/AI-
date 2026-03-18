@@ -100,7 +100,7 @@ class DataFetcher:
                 return None
 
             # 标准化列名
-            data.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
+            # data.columns = ['Open', 'High', 'Low', 'Close', 'Volume']
 
             # 重置索引
             data.reset_index(inplace=True)

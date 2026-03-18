@@ -40,9 +40,9 @@ class AIAnalyzer:
                 raise ValueError("Gemini API Key not found. Please set it in st.secrets or as an environment variable.")
 
             genai.configure(api_key=api_key)
-            # 遵照指示，更新模型
-            self.model = genai.GenerativeModel('gemini-1.5-flash')
-            logger.info("AIAnalyzer initialized successfully with model 'gemini-1.5-flash'.")
+            # 遵从用户的最终、精确指示，使用正确的模型ID
+            self.model = genai.GenerativeModel('gemini-3.1-flash-lite-preview')
+            logger.info("AIAnalyzer initialized successfully with model 'gemini-3.1-flash-lite-preview'.")
         except Exception as e:
             logger.error(f"Error initializing AIAnalyzer: {e}")
             # 重新引发异常，以便UI可以捕获并显示它

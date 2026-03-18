@@ -38,6 +38,13 @@ class DataFetcher:
 
         self.logger.info("DataFetcher initialized")
 
+    def get_historical_data(self, symbol: str, period: str = '1y',
+                            interval: str = '1d') -> Optional[pd.DataFrame]:
+        """
+        获取历史数据 (兼容性方法)
+        """
+        return self.fetch_stock_data(symbol, period, interval)
+
     def fetch_stock_data(self, symbol: str, period: str = '1y',
                         interval: str = '1d') -> Optional[pd.DataFrame]:
         """

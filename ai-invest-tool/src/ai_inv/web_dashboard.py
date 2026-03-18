@@ -309,16 +309,24 @@ def ai_analysis_page():
     # 配置 AI API
     st.sidebar.subheader("AI 配置")
     ai_provider = st.sidebar.selectbox("AI 提供商", ["Gemini", "OpenAI"], index=0)
-    
+
+    # 安全地加载和设置API密钥
+    api_key_configured = False
     if ai_provider == "Gemini":
-        gemini_key = st.sidebar.text_input("Gemini API Key", type="password", value=os.getenv('GEMINI_API_KEY', ''))
-        if gemini_key:
-            os.environ['GEMINI_API_KEY'] = gemini_key
-    else:
-        openai_key = st.sidebar.text_input("OpenAI API Key", type="password", value=os.getenv('OPENAI_API_KEY', ''))
-        if openai_key:
-            os.environ['OPENAI_API_KEY'] = openai_key
-    
+        if 'GEMINI_API_KEY' in st.secrets:
+            os.environ['GEMINI_API_KEY'] = st.secrets['GEMINI_API_KEY']
+            api_key_configured = True
+        else:
+            st.sidebar.warning("请设置 Gemini API 密钥！")
+            st.info("💡 如何设置: 部署到 Streamlit Cloud 后，进入应用的 'Settings' -> 'Secrets'，添加一个名为 `GEMINI_API_KEY` 的新密钥，并将您的密钥值粘贴进去。")
+    else: # OpenAI
+        if 'OPENAI_API_KEY' in st.secrets:
+            os.environ['OPENAI_API_KEY'] = st.secrets['OPENAI_API_KEY']
+            api_key_configured = True
+        else:
+            st.sidebar.warning("请设置 OpenAI API 密钥！")
+            st.info("💡 如何设置: 部署到 Streamlit Cloud 后，进入应用的 'Settings' -> 'Secrets'，添加一个名为 `OPENAI_API_KEY` 的新密钥，并将您的密钥值粘贴进去。")
+
     # 股票选择
     symbol = st.text_input("股票代码", value="^HSI")
     
@@ -328,66 +336,69 @@ def ai_analysis_page():
         ["基础AI分析", "情感分析", "智能顾问"]
     )
     
-    # 分析按钮
-    if st.button("开始AI分析", type="primary"):
-        # 清除旧的分析结果
-        for key in ['ai_result', 'sentiment_result', 'advisor_result']:
-            if key in st.session_state:
-                del st.session_state[key]
+    # 只有在API密钥配置好的情况下才显示分析按钮
+    if api_key_configured:
+        if st.button("开始AI分析", type="primary"):
+            # 清除旧的分析结果
+            for key in ['ai_result', 'sentiment_result', 'advisor_result']:
+                if key in st.session_state:
+                    del st.session_state[key]
 
-        with st.spinner("AI正在分析中..."):
-            try:
-                if analysis_type == "基础AI分析":
-                    ai_analyzer = AIAnalyzer()
-                    tech_analyzer = TechnicalAnalyzer()
-                    
-                    tech_data = tech_analyzer.analyze_stock(symbol, period='3mo')
-                    
-                    if tech_data is not None and not tech_data.empty:
-                        signal = tech_analyzer.get_trading_signal(symbol)
-                        analysis_data = {
-                            '价格': {
-                                '收盘价': tech_data['Close'].iloc[-1],
-                                '涨跌幅': ((tech_data['Close'].iloc[-1] - tech_data['Close'].iloc[-2]) / 
-                                         tech_data['Close'].iloc[-2] * 100) if len(tech_data) >= 2 else 0
-                            },
-                            '交易信号': signal['交易信号'],
-                            '信号强度': signal['强度']
-                        }
-                        ai_result = ai_analyzer.analyze_stock_with_ai(symbol, analysis_data)
-                        st.session_state.ai_result = ai_result
-                    else:
-                        st.error(f"❌ 无法获取股票代码 '{symbol}' 的数据。")
-                        st.info("💡 请检查代码是否正确。例如，恒生指数应为 '^HSI'，港股代码应以 '.HK' 结尾。")
+            with st.spinner("AI正在分析中..."):
+                try:
+                    if analysis_type == "基础AI分析":
+                        ai_analyzer = AIAnalyzer()
+                        tech_analyzer = TechnicalAnalyzer()
+                        
+                        tech_data = tech_analyzer.analyze_stock(symbol, period='3mo')
+                        
+                        if tech_data is not None and not tech_data.empty:
+                            signal = tech_analyzer.get_trading_signal(symbol)
+                            analysis_data = {
+                                '价格': {
+                                    '收盘价': tech_data['Close'].iloc[-1],
+                                    '涨跌幅': ((tech_data['Close'].iloc[-1] - tech_data['Close'].iloc[-2]) / 
+                                             tech_data['Close'].iloc[-2] * 100) if len(tech_data) >= 2 else 0
+                                },
+                                '交易信号': signal['交易信号'],
+                                '信号强度': signal['强度']
+                            }
+                            ai_result = ai_analyzer.analyze_stock_with_ai(symbol, analysis_data)
+                            st.session_state.ai_result = ai_result
+                        else:
+                            st.error(f"❌ 无法获取股票代码 '{symbol}' 的数据。")
+                            st.info("💡 请检查代码是否正确。例如，恒生指数应为 '^HSI'，港股代码应以 '.HK' 结尾。")
 
-                elif analysis_type == "情感分析":
-                    sentiment_analyzer = SentimentAnalyzer()
-                    text = st.text_area(
-                        "输入要分析的新闻或文本",
-                        value="恆生指數今日上漲2%，市場情緒樂觀，投資者對經濟前景看好",
-                        height=100
-                    )
-                    result = sentiment_analyzer.analyze_text(text)
-                    st.session_state.sentiment_result = result
-                    
-                elif analysis_type == "智能顾问":
-                    advisor = SmartAdvisor()
-                    result = advisor.get_comprehensive_analysis(symbol)
-                    
-                    if result.get("error"):
-                        st.error(f"❌ 智能顾问分析失败: {result['error']}")
-                        st.info(f"💡 这通常是由于无法获取股票代码 '{symbol}' 的数据造成的。请检查您的代码。")
-                    else:
-                        st.session_state.advisor_result = result
-            
-            except KeyError as e:
-                st.error(f"❌ 分析失败：在处理数据时找不到所需的项目 '{e}'。")
-                st.info(f"💡 这很可能是由于股票代码 '{symbol}' 无效或没有返回预期的市场数据。请尝试使用正确的代码，例如 '^HSI' 或 '700.HK'。")
+                    elif analysis_type == "情感分析":
+                        sentiment_analyzer = SentimentAnalyzer()
+                        text = st.text_area(
+                            "输入要分析的新闻或文本",
+                            value="恆生指數今日上漲2%，市場情緒樂觀，投資者對經濟前景看好",
+                            height=100
+                        )
+                        result = sentiment_analyzer.analyze_text(text)
+                        st.session_state.sentiment_result = result
+                        
+                    elif analysis_type == "智能顾问":
+                        advisor = SmartAdvisor()
+                        result = advisor.get_comprehensive_analysis(symbol)
+                        
+                        if result.get("error"):
+                            st.error(f"❌ 智能顾问分析失败: {result['error']}")
+                            st.info(f"💡 这通常是由于无法获取股票代码 '{symbol}' 的数据造成的。请检查您的代码。")
+                        else:
+                            st.session_state.advisor_result = result
+                
+                except KeyError as e:
+                    st.error(f"❌ 分析失败：在处理数据时找不到所需的项目 '{e}'。")
+                    st.info(f"💡 这很可能是由于股票代码 '{symbol}' 无效或没有返回预期的市场数据。请尝试使用正确的代码，例如 '^HSI' 或 '700.HK'。")
 
-            except Exception as e:
-                st.error(f"❌ 发生未知错误: {str(e)}")
-                st.exception(e) # 显示完整的错误堆栈以供调试
-    
+                except Exception as e:
+                    st.error(f"❌ 发生未知错误: {str(e)}")
+                    st.exception(e) # 显示完整的错误堆栈以供调试
+    else:
+        st.warning("请先在 Streamlit Cloud 中配置您的 API 密钥以启用 AI 分析功能。")
+
     # 显示AI分析结果
     if 'ai_result' in st.session_state:
         result = st.session_state.ai_result

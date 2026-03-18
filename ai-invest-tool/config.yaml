@@ -7,7 +7,7 @@
 
 # Gemini API
 gemini:
-  api_key: "AIzaSyC2PkMewsCyYlbDStE-QXxHiiqnrgVJqnk"
+  api_key: "your-gemini-api-key-here"
 
 # OpenAI API (ChatGPT)
 openai:

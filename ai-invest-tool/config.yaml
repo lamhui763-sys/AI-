@@ -5,6 +5,10 @@
 # API配置
 # ================================
 
+# Gemini API
+gemini:
+  api_key: "AIzaSyC2PkMewsCyYlbDStE-QXxHiiqnrgVJqnk"
+
 # OpenAI API (ChatGPT)
 openai:
   api_key: "your-openai-api-key-here"

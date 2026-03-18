@@ -1,4 +1,4 @@
-"""
+'''"""
 Web仪表板模块
 使用Streamlit创建交互式Web界面
 
@@ -330,59 +330,63 @@ def ai_analysis_page():
     
     # 分析按钮
     if st.button("开始AI分析", type="primary"):
+        # 清除旧的分析结果
+        for key in ['ai_result', 'sentiment_result', 'advisor_result']:
+            if key in st.session_state:
+                del st.session_state[key]
+
         with st.spinner("AI正在分析中..."):
             try:
                 if analysis_type == "基础AI分析":
-                    # AI分析
                     ai_analyzer = AIAnalyzer()
                     tech_analyzer = TechnicalAnalyzer()
                     
-                    # 获取技术分析
                     tech_data = tech_analyzer.analyze_stock(symbol, period='3mo')
-                    signal = tech_analyzer.get_trading_signal(symbol)
                     
-                    # 准备数据
-                    analysis_data = {
-                        '价格': {
-                            '收盘价': tech_data['Close'].iloc[-1],
-                            '涨跌幅': ((tech_data['Close'].iloc[-1] - tech_data['Close'].iloc[-2]) / 
-                                     tech_data['Close'].iloc[-2] * 100) if len(tech_data) >= 2 else 0
-                        },
-                        '交易信号': signal['交易信号'],
-                        '信号强度': signal['强度']
-                    }
-                    
-                    # AI分析
-                    ai_result = ai_analyzer.analyze_stock_with_ai(symbol, analysis_data)
-                    
-                    st.session_state.ai_result = ai_result
-                    
+                    if tech_data is not None and not tech_data.empty:
+                        signal = tech_analyzer.get_trading_signal(symbol)
+                        analysis_data = {
+                            '价格': {
+                                '收盘价': tech_data['Close'].iloc[-1],
+                                '涨跌幅': ((tech_data['Close'].iloc[-1] - tech_data['Close'].iloc[-2]) / 
+                                         tech_data['Close'].iloc[-2] * 100) if len(tech_data) >= 2 else 0
+                            },
+                            '交易信号': signal['交易信号'],
+                            '信号强度': signal['强度']
+                        }
+                        ai_result = ai_analyzer.analyze_stock_with_ai(symbol, analysis_data)
+                        st.session_state.ai_result = ai_result
+                    else:
+                        st.error(f"❌ 无法获取股票代码 '{symbol}' 的数据。")
+                        st.info("💡 请检查代码是否正确。例如，恒生指数应为 '^HSI'，港股代码应以 '.HK' 结尾。")
+
                 elif analysis_type == "情感分析":
-                    # 情感分析
                     sentiment_analyzer = SentimentAnalyzer()
-                    
-                    # 示例文本
                     text = st.text_area(
                         "输入要分析的新闻或文本",
                         value="恆生指數今日上漲2%，市場情緒樂觀，投資者對經濟前景看好",
                         height=100
                     )
-                    
                     result = sentiment_analyzer.analyze_text(text)
-                    
                     st.session_state.sentiment_result = result
                     
                 elif analysis_type == "智能顾问":
-                    # 智能顾问
                     advisor = SmartAdvisor()
-                    
-                    # 综合分析
                     result = advisor.get_comprehensive_analysis(symbol)
                     
-                    st.session_state.advisor_result = result
-                    
+                    if result.get("error"):
+                        st.error(f"❌ 智能顾问分析失败: {result['error']}")
+                        st.info(f"💡 这通常是由于无法获取股票代码 '{symbol}' 的数据造成的。请检查您的代码。")
+                    else:
+                        st.session_state.advisor_result = result
+            
+            except KeyError as e:
+                st.error(f"❌ 分析失败：在处理数据时找不到所需的项目 '{e}'。")
+                st.info(f"💡 这很可能是由于股票代码 '{symbol}' 无效或没有返回预期的市场数据。请尝试使用正确的代码，例如 '^HSI' 或 '700.HK'。")
+
             except Exception as e:
-                st.error(f"❌ 错误: {str(e)}")
+                st.error(f"❌ 发生未知错误: {str(e)}")
+                st.exception(e) # 显示完整的错误堆栈以供调试
     
     # 显示AI分析结果
     if 'ai_result' in st.session_state:
@@ -764,7 +768,8 @@ def news_analysis_page():
                 keywords_str = " | ".join(result['keywords'])
                 st.markdown(f"**{keywords_str}**")
             
-            st.write("\n**情感说明:**")
+            st.write("
+**情感说明:**")
             if result['sentiment'] == 'positive':
                 st.success("新闻内容整体偏向正面，市场情绪乐观")
             elif result['sentiment'] == 'negative':
@@ -772,7 +777,8 @@ def news_analysis_page():
             else:
                 st.info("新闻内容中性，市场情绪平稳")
             
-            st.write(f"\n**情感分数:** {result['score']:.2f} (范围: -1.0 到 1.0)")
+            st.write(f"
+**情感分数:** {result['score']:.2f} (范围: -1.0 到 1.0)")
             st.write(f"**置信度:** {result['confidence']:.1%}")
             
         except Exception as e:
@@ -1119,3 +1125,4 @@ def display_technical_details(indicators: Dict[str, Any]):
 
 if __name__ == "__main__":
     main()
+''

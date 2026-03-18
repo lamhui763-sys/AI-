@@ -1,4 +1,4 @@
-"""
+'"""
 Web仪表板模块
 使用Streamlit创建交互式Web界面
 
@@ -8,7 +8,7 @@ Web仪表板模块
 - 交互式图表
 - AI分析结果展示
 - 回测结果可视化
-"""
+"""'
 
 import streamlit as st
 import pandas as pd

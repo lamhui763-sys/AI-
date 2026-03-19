@@ -12,6 +12,8 @@ import yfinance as yf
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List
+import requests
+import json
 
 
 class DataFetcher:
@@ -291,3 +293,98 @@ class DataFetcher:
         except Exception as e:
             self.logger.error(f"Error getting stock info: {str(e)}")
             return None
+
+    def fetch_stock_news(self, symbol: str) -> List[Dict]:
+        """
+        获取股票新闻
+
+        Args:
+            symbol: 股票代码
+
+        Returns:
+            list: 新闻列表
+        """
+        self.logger.info(f"Fetching news for {symbol}")
+        try:
+            ticker = yf.Ticker(symbol)
+            news = ticker.news if hasattr(ticker, 'news') else []
+            
+            formatted_news = []
+            for item in news:
+                # 兼容不同结构的 yfinance 返回
+                content = item.get('content', item)
+                publish_time = item.get('providerPublishTime', 0)
+                formatted_time = datetime.fromtimestamp(publish_time).strftime('%Y-%m-%d %H:%M') if publish_time > 0 else 'N/A'
+                
+                formatted_news.append({
+                    'title': content.get('title', ''),
+                    'source': provider.get('displayName', item.get('publisher', 'Unknown')),
+                    'time': formatted_time,
+                    'summary': content.get('summary', content.get('description', '')),
+                    'url': content.get('canonicalUrl', {}).get('url', item.get('link', ''))
+                })
+            
+            return formatted_news
+        except Exception as e:
+            self.logger.error(f"Error fetching news for {symbol}: {str(e)}")
+            return []
+    def fetch_search_news(self, search_results: List[Dict]) -> List[Dict]:
+        """
+        將搜索結果轉換為新聞格式
+        """
+        formatted_news = []
+        for item in search_results:
+            formatted_news.append({
+                'title': item.get('title', ''),
+                'source': 'Web Search',
+                'time': datetime.now().strftime('%Y-%m-%d %H:%M'),
+                'summary': item.get('snippet', item.get('description', '')),
+                'url': item.get('link', item.get('url', ''))
+            })
+        return formatted_news
+
+    def fetch_serper_news(self, query: str, api_key: str) -> List[Dict]:
+        """
+        使用 Serper.dev API 搜尋最新財經資訊
+        """
+        self.logger.info(f"Using Serper.dev to search for: {query}")
+        url = "https://google.serper.dev/search"
+        payload = json.dumps({"q": query, "num": 10})
+        headers = {
+            'X-API-KEY': api_key,
+            'Content-Type': 'application/json'
+        }
+        
+        try:
+            response = requests.request("POST", url, headers=headers, data=payload, timeout=10)
+            if response.status_code == 200:
+                results = response.json()
+                search_news = []
+                
+                # 處理自然搜索結果 (organic)
+                for item in results.get('organic', []):
+                    search_news.append({
+                        'title': item.get('title', ''),
+                        'source': item.get('link', '').split('/')[2] if '//' in item.get('link', '') else 'Web',
+                        'time': datetime.now().strftime('%Y-%m-%d %H:%M'),
+                        'summary': item.get('snippet', ''),
+                        'url': item.get('link', '')
+                    })
+                
+                # 處理新聞結果 (news)
+                for item in results.get('news', []):
+                    search_news.append({
+                        'title': item.get('title', ''),
+                        'source': item.get('source', 'News'),
+                        'time': item.get('date', datetime.now().strftime('%Y-%m-%d %H:%M')),
+                        'summary': item.get('snippet', ''),
+                        'url': item.get('link', '')
+                    })
+                
+                return search_news
+            else:
+                self.logger.error(f"Serper API error: {response.status_code} - {response.text}")
+                return []
+        except Exception as e:
+            self.logger.error(f"Error calling Serper API: {str(e)}")
+            return []

@@ -1,0 +1,7 @@
+.env
+**/.streamlit/secrets.toml
+**/__pycache__/
+web_search_results.json
+verify_backtest.py
+*.pyc
+.ipynb_checkpoints/

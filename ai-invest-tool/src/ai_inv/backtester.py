@@ -19,13 +19,14 @@ class Strategy:
     def __init__(self):
         """初始化策略"""
         self.name = "Base Strategy"
-    
-    def generate_signal(self, data: pd.DataFrame) -> Dict:
+
+    def generate_signal(self, data: pd.DataFrame, current_cash: float = 0.0) -> Dict:
         """
         生成交易信号
         
         Args:
             data: 历史数据
+            current_cash: 当前可用资金
             
         Returns:
             信号字典 {'action': 'buy/sell/hold', 'quantity': x}
@@ -106,8 +107,8 @@ class BacktestEngine:
             # 计算当前组合价值
             self._calculate_portfolio_value(current_price, date)
             
-            # FIX: 调用策略实例的 generate_signal 方法，而不是调用实例本身
-            signal = strategy.generate_signal(data.iloc[:i+1])
+            # FIX: 调用策略实例的 generate_signal 方法，并傳遞當前資金
+            signal = strategy.generate_signal(data.iloc[:i+1], current_cash=self.cash)
             
             # 执行交易
             self._execute_trades(signal, current_price, date)
@@ -186,7 +187,11 @@ class BacktestEngine:
             sell_quantity = min(quantity, current_quantity)
             
             if sell_quantity > 0:
-                self.cash += (sell_quantity * execution_price - commission)
+                # 重新计算实际交易金额和手续费
+                actual_trade_value = sell_quantity * execution_price
+                actual_commission = actual_trade_value * self.commission
+                
+                self.cash += (actual_trade_value - actual_commission)
                 self.positions[symbol] -= sell_quantity
                 if self.positions[symbol] == 0:
                     del self.positions[symbol]
@@ -197,8 +202,8 @@ class BacktestEngine:
                     'symbol': symbol,
                     'quantity': sell_quantity,
                     'price': execution_price,
-                    'value': sell_quantity * execution_price,
-                    'commission': commission
+                    'value': actual_trade_value,
+                    'commission': actual_commission
                 })
     
     def _calculate_performance_metrics(self) -> Dict:
@@ -331,20 +336,22 @@ class BacktestEngine:
 class MAStrategy(Strategy):
     """移动平均策略"""
     
-    def __init__(self, short_period: int = 5, long_period: int = 20):
+    def __init__(self, short_period: int = 5, long_period: int = 20, quantity: int = 100):
         """
         初始化移动平均策略
         
         Args:
             short_period: 短期均线周期
             long_period: 长期均线周期
+            quantity: 默认交易数量 (0表示自动计算)
         """
         super().__init__()
         self.name = f"MA({short_period},{long_period})"
         self.short_period = short_period
         self.long_period = long_period
+        self.quantity = quantity
     
-    def generate_signal(self, data: pd.DataFrame) -> Dict:
+    def generate_signal(self, data: pd.DataFrame, current_cash: float = 0.0) -> Dict:
         """生成移动平均交叉信号"""
         # 确保指标名称与 indicators.py 中生成的一致
         short_ma_col = f'SMA_{self.short_period}'
@@ -355,6 +362,7 @@ class MAStrategy(Strategy):
         
         latest = data.iloc[-1]
         prev = data.iloc[-2]
+        current_price = latest['Close']
         
         # 安全地获取指标
         short_ma = latest.get(short_ma_col)
@@ -365,21 +373,30 @@ class MAStrategy(Strategy):
         if short_ma is None or long_ma is None or prev_short_ma is None or prev_long_ma is None:
              return {'action': 'hold'}
         
+        # 计算动态数量 (使用可用资金的 95%)
+        # 如果 self.quantity > 0 且资金足够，使用 self.quantity；否则自动计算
+        trade_quantity = self.quantity
+        if current_cash > 0:
+            max_affordable = int(current_cash * 0.95 / current_price)
+            if self.quantity == 0 or self.quantity > max_affordable:
+                trade_quantity = max_affordable
+
         # 金叉：短期均线上穿长期均线
         if short_ma > long_ma and prev_short_ma <= prev_long_ma:
+            if trade_quantity <= 0: return {'action': 'hold'}
             return {
                 'action': 'buy',
                 'symbol': 'DEFAULT',
-                'quantity': 100  # 固定数量
+                'quantity': trade_quantity
             }
         
         # 死叉：短期均线下穿长期均线
         elif short_ma < long_ma and prev_short_ma >= prev_long_ma:
-            # 卖出所有持仓
+            # 卖出所有持仓 (这里简化为卖出 trade_quantity，但實際 Engine 會處理最大值)
             return {
                 'action': 'sell',
                 'symbol': 'DEFAULT',
-                'quantity': 100  # 固定数量
+                'quantity': 1000000000 # 卖出所有
             }
         
         return {'action': 'hold'}
@@ -403,7 +420,7 @@ class RSIStrategy(Strategy):
         self.oversold = oversold
         self.overbought = overbought
     
-    def generate_signal(self, data: pd.DataFrame) -> Dict:
+    def generate_signal(self, data: pd.DataFrame, current_cash: float = 0.0) -> Dict:
         """生成RSI信号"""
         rsi_col = f'RSI_{self.period}'
         if len(data) < self.period or rsi_col not in data.columns:
@@ -411,16 +428,23 @@ class RSIStrategy(Strategy):
         
         latest = data.iloc[-1]
         prev = data.iloc[-2]
+        current_price = latest['Close']
         
         rsi = latest.get(rsi_col, 50)
         prev_rsi = prev.get(rsi_col, 50)
+
+        # 計算動態數量
+        trade_quantity = 100 # 默認
+        if current_cash > 0:
+            trade_quantity = int(current_cash * 0.95 / current_price)
         
         # RSI从超卖区向上穿越
         if rsi > self.oversold and prev_rsi <= self.oversold:
+            if trade_quantity <= 0: return {'action': 'hold'}
             return {
                 'action': 'buy',
                 'symbol': 'DEFAULT',
-                'quantity': 100
+                'quantity': trade_quantity
             }
         
         # RSI从超买区向下穿越
@@ -428,7 +452,7 @@ class RSIStrategy(Strategy):
             return {
                 'action': 'sell',
                 'symbol': 'DEFAULT',
-                'quantity': 100
+                'quantity': 1000000000 # 卖出所有
             }
         
         return {'action': 'hold'}
@@ -452,7 +476,7 @@ class MACDStrategy(Strategy):
         self.slow_period = slow_period
         self.signal_period = signal_period
     
-    def generate_signal(self, data: pd.DataFrame) -> Dict:
+    def generate_signal(self, data: pd.DataFrame, current_cash: float = 0.0) -> Dict:
         """生成MACD信号"""
         hist_col = 'MACD_Histogram'
         if len(data) < self.slow_period + self.signal_period or hist_col not in data.columns:
@@ -460,6 +484,7 @@ class MACDStrategy(Strategy):
         
         latest = data.iloc[-1]
         prev = data.iloc[-2]
+        current_price = latest['Close']
         
         macd_hist = latest.get(hist_col)
         prev_macd_hist = prev.get(hist_col)
@@ -467,12 +492,18 @@ class MACDStrategy(Strategy):
         if macd_hist is None or prev_macd_hist is None:
             return {'action': 'hold'}
         
+        # 計算動態數量
+        trade_quantity = 100 # 默認
+        if current_cash > 0:
+            trade_quantity = int(current_cash * 0.95 / current_price)
+        
         # MACD柱状图由负转正（金叉）
         if macd_hist > 0 and prev_macd_hist <= 0:
+            if trade_quantity <= 0: return {'action': 'hold'}
             return {
                 'action': 'buy',
                 'symbol': 'DEFAULT',
-                'quantity': 100
+                'quantity': trade_quantity
             }
         
         # MACD柱状图由正转负（死叉）
@@ -480,7 +511,7 @@ class MACDStrategy(Strategy):
             return {
                 'action': 'sell',
                 'symbol': 'DEFAULT',
-                'quantity': 100
+                'quantity': 1000000000 # 賣出所有
             }
         
         return {'action': 'hold'}
@@ -506,31 +537,41 @@ class CombinedStrategy(Strategy):
         else:
             self.weights = weights
     
-    def generate_signal(self, data: pd.DataFrame) -> Dict:
+    def generate_signal(self, data: pd.DataFrame, current_cash: float = 0.0) -> Dict:
         """生成组合信号"""
         buy_votes = 0
         sell_votes = 0
         
         for strategy in self.strategies:
-            signal = strategy.generate_signal(data)
+            signal = strategy.generate_signal(data, current_cash=current_cash)
             
             if signal['action'] == 'buy':
                 buy_votes += 1
             elif signal['action'] == 'sell':
                 sell_votes += 1
         
-        # 投票机制
+        # 投票机制 (數量使用最新計算的值)
         if buy_votes > len(self.strategies) / 2:
+            # 这里的 quantity 会在具体的子策略中被重新计算，
+            # 这里的逻辑主要是为了决策，具体买多少由 Engine 决定 (如果策略返回 0)
+            # 我们在这里再次计算一下以保持一致
+            latest = data.iloc[-1]
+            current_price = latest['Close']
+            trade_quantity = 100
+            if current_cash > 0:
+                trade_quantity = int(current_cash * 0.95 / current_price)
+            
+            if trade_quantity <= 0: return {'action': 'hold'}
             return {
                 'action': 'buy',
                 'symbol': 'DEFAULT',
-                'quantity': 100
+                'quantity': trade_quantity
             }
         elif sell_votes > len(self.strategies) / 2:
             return {
                 'action': 'sell',
                 'symbol': 'DEFAULT',
-                'quantity': 100
+                'quantity': 1000000000 # 賣出所有
             }
         
         return {'action': 'hold'}

@@ -27,18 +27,21 @@ class AIAnalyzer:
         初始化AI分析器。
         优先使用传入的api_key，否则从环境变量或Streamlit secrets中查找。
         """
+        # 优先从环境变量获取，这在本地开发中很常见且不会触发 Streamlit 错误
+        api_key = os.environ.get("GEMINI_API_KEY")
+
+        # 其次，尝试从 Streamlit secrets 获取
+        if not api_key and st:
+            try:
+                if hasattr(st, 'secrets'):
+                    api_key = st.secrets.get("GEMINI_API_KEY")
+            except Exception as e:
+                logger.warning(f"Could not access Streamlit secrets: {e}")
+
+        if not api_key:
+            raise ValueError("Gemini API Key not found. Please set it as an environment variable or in Streamlit secrets.")
+
         try:
-            # 优先从Streamlit secrets获取（在Streamlit Cloud环境中）
-            if st and hasattr(st, 'secrets') and "GEMINI_API_KEY" in st.secrets:
-                api_key = st.secrets["GEMINI_API_KEY"]
-            
-            # 否则，从环境变量获取
-            if not api_key:
-                api_key = os.environ.get("GEMINI_API_KEY")
-
-            if not api_key:
-                raise ValueError("Gemini API Key not found. Please set it in st.secrets or as an environment variable.")
-
             genai.configure(api_key=api_key)
             # 遵从用户的最终、精确指示，使用正确的模型ID
             self.model = genai.GenerativeModel('gemini-3.1-flash-lite-preview')

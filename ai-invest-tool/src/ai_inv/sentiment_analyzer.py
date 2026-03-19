@@ -1,6 +1,6 @@
 """
 情感分析模块
-分析市场新闻、社交媒体、财报等的情感倾向
+分析市场新闻、社交媒體、財報等的情感傾向
 """
 
 import logging
@@ -8,14 +8,23 @@ from typing import Dict, List, Optional, Tuple
 import re
 from datetime import datetime
 
-try:
-    import jieba
-    JIEBA_AVAILABLE = True
-except ImportError:
-    JIEBA_AVAILABLE = False
+import streamlit as st
+import os
+import json
+import google.generativeai as genai
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# 嘗試獲取 API Key 的輔助函數
+def get_api_key():
+    api_key = os.getenv('GEMINI_API_KEY')
+    if not api_key:
+        try:
+            if st and hasattr(st, 'secrets'):
+                api_key = st.secrets.get('GEMINI_API_KEY')
+        except Exception: pass
+    return api_key
 
 
 class SentimentAnalyzer:
@@ -26,14 +35,31 @@ class SentimentAnalyzer:
         self.config = config or {}
         self.logger = logger
         
-        # 初始化情感词典
+        # 初始化情感詞典 (備用方案)
         self.positive_words = self._load_positive_words()
         self.negative_words = self._load_negative_words()
         
+        # 初始化 Gemini
+        self.api_key = get_api_key()
+        self.ai_enabled = False
+        if self.api_key:
+            try:
+                genai.configure(api_key=self.api_key)
+                self.model = genai.GenerativeModel('gemini-3.1-flash-lite-preview')
+                self.ai_enabled = True
+                logger.info("Gemini API 已為情感分析啟用 (gemini-3.1-flash-lite-preview)")
+            except Exception as e:
+                logger.error(f"Gemini 初始化失敗: {e}")
+
         # 初始化分词器
-        if JIEBA_AVAILABLE:
-            jieba.initialize()
-            logger.info("jieba分词器初始化成功")
+        if not self.ai_enabled:
+            try:
+                import jieba
+                jieba.initialize()
+                self.jieba_available = True
+                logger.info("jieba分词器初始化成功")
+            except ImportError:
+                self.jieba_available = False
     
     def _load_positive_words(self) -> set:
         """加载正面情感词"""
@@ -73,13 +99,57 @@ class SentimentAnalyzer:
     def analyze_text(self, text: str) -> Dict:
         """
         分析文本情感
-        
-        Args:
-            text: 要分析的文本
-            
-        Returns:
-            情感分析结果
         """
+        if self.ai_enabled:
+            return self._analyze_text_with_ai(text)
+        return self._analyze_text_with_dictionary(text)
+
+    def _analyze_text_with_ai(self, text: str) -> Dict:
+        """使用 AI 分析文本情感"""
+        prompt = f"""
+        請分析以下財經新聞的情感傾向，並以 JSON 格式返回。
+        情感分為: positive, negative, neutral。
+        分數範圍為: -1.0 (極度負面) 到 1.0 (極度正面)。
+        同時提取 3-5 個關鍵詞。
+        
+        新聞內容: {text}
+        
+        請嚴格遵守以下 JSON 格式：
+        {{
+            "sentiment": "positive/negative/neutral",
+            "score": 0.5,
+            "keywords": ["關鍵詞1", "關鍵詞2"],
+            "summary": "一句話簡短總結這條新聞"
+        }}
+        """
+        try:
+            response = self.model.generate_content(prompt)
+            # 更強大的 JSON 提取方式
+            text_resp = response.text
+            match = re.search(r'\{.*\}', text_resp, re.DOTALL)
+            if match:
+                json_str = match.group()
+                data = json.loads(json_str)
+            else:
+                data = json.loads(text_resp.strip())
+            
+            # 確保所有必要字段都存在
+            return {
+                'sentiment': data.get('sentiment', 'neutral'),
+                'score': float(data.get('score', 0.0)),
+                'keywords': data.get('keywords', []),
+                'summary': data.get('summary', '無摘要'),
+                'positive_words': [],
+                'negative_words': [],
+                'confidence': 0.9,
+                'method': 'gemini'
+            }
+        except Exception as e:
+            logger.error(f"AI 情感分析失敗: {e}")
+            return self._analyze_text_with_dictionary(text)
+
+    def _analyze_text_with_dictionary(self, text: str) -> Dict:
+        """使用詞典方法分析文本情感 (備用)"""
         # 预处理
         cleaned_text = self._preprocess_text(text)
         
@@ -111,53 +181,12 @@ class SentimentAnalyzer:
     def analyze_news(self, news_items: List[Dict]) -> Dict:
         """
         分析新闻列表的情感
-        
-        Args:
-            news_items: 新闻列表
-            
-        Returns:
-            综合情感分析结果
         """
-        total_score = 0
-        all_positive = []
-        all_negative = []
-        detailed_results = []
-        
-        for item in news_items:
-            text = item.get('title', '') + ' ' + item.get('summary', '')
-            result = self.analyze_text(text)
-            
-            total_score += result['score']
-            all_positive.extend(result['positive_words'])
-            all_negative.extend(result['negative_words'])
-            detailed_results.append({
-                'title': item.get('title', ''),
-                'sentiment': result['sentiment'],
-                'score': result['score']
-            })
-        
-        avg_score = total_score / len(news_items) if news_items else 0
-        overall_sentiment = self._determine_sentiment(avg_score)
-        
-        return {
-            'overall_sentiment': overall_sentiment,
-            'average_score': avg_score,
-            'positive_words': list(set(all_positive)),
-            'negative_words': list(set(all_negative)),
-            'news_count': len(news_items),
-            'detailed_results': detailed_results,
-            'analysis_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-        }
+        return self.batch_analyze_news(news_items)
     
     def analyze_sentiment_trend(self, sentiment_history: List[Dict]) -> Dict:
         """
         分析情感趋势
-        
-        Args:
-            sentiment_history: 历史情感数据列表
-            
-        Returns:
-            趋势分析结果
         """
         if not sentiment_history:
             return {'trend': 'unknown', 'message': '无历史数据'}
@@ -174,13 +203,13 @@ class SentimentAnalyzer:
         
         if recent_avg > earlier_avg + 0.1:
             trend = 'improving'
-            message = '情感趋向正面'
+            message = '情感趨向正面'
         elif recent_avg < earlier_avg - 0.1:
             trend = 'declining'
-            message = '情感趋向负面'
+            message = '情感趨向負面'
         else:
             trend = 'stable'
-            message = '情感保持稳定'
+            message = '情感保持穩定'
         
         return {
             'trend': trend,
@@ -194,37 +223,28 @@ class SentimentAnalyzer:
         """预处理文本"""
         # 转换为小写
         text = text.lower()
-        
         # 移除特殊字符
         text = re.sub(r'[^\w\s\u4e00-\u9fff]', ' ', text)
-        
         # 移除多余空格
         text = ' '.join(text.split())
-        
         return text
     
     def _tokenize(self, text: str) -> List[str]:
         """分词"""
-        if JIEBA_AVAILABLE:
+        if hasattr(self, 'jieba_available') and self.jieba_available:
+            import jieba
             return list(jieba.cut(text))
         else:
-            # 简单按空格分割
             return text.split()
     
     def _calculate_sentiment_score(self, words: List[str]) -> float:
         """计算情感分数"""
         positive_count = sum(1 for word in words if word in self.positive_words)
         negative_count = sum(1 for word in words if word in self.negative_words)
-        
         total = positive_count + negative_count
-        
         if total == 0:
             return 0.0
-        
-        # 计算归一化分数 (-1 到 1)
-        score = (positive_count - negative_count) / total
-        
-        return score
+        return (positive_count - negative_count) / total
     
     def _determine_sentiment(self, score: float) -> str:
         """确定情感类别"""
@@ -238,7 +258,6 @@ class SentimentAnalyzer:
     def _calculate_strength(self, score: float) -> str:
         """计算情感强度"""
         abs_score = abs(score)
-        
         if abs_score > 0.6:
             return 'strong'
         elif abs_score > 0.3:
@@ -246,8 +265,7 @@ class SentimentAnalyzer:
         else:
             return 'weak'
     
-    def _extract_sentiment_words(self, words: List[str], 
-                                   sentiment_words: set) -> set:
+    def _extract_sentiment_words(self, words: List[str], sentiment_words: set) -> set:
         """提取情感词"""
         return set(word for word in words if word in sentiment_words)
     
@@ -255,14 +273,9 @@ class SentimentAnalyzer:
         """计算置信度"""
         if word_count < 5:
             return 0.3
-        
-        # 基于分数绝对值和词数量的置信度
         base_confidence = min(abs(score) * 1.5, 1.0)
         word_factor = min(word_count / 20.0, 1.0)
-        
-        confidence = base_confidence * word_factor
-        
-        return round(confidence, 2)
+        return round(base_confidence * word_factor, 2)
 
 
 class NewsSentimentAnalyzer:
@@ -277,12 +290,6 @@ class NewsSentimentAnalyzer:
     def analyze_news_sentiment(self, news_data: Dict) -> Dict:
         """
         分析新闻情感
-        
-        Args:
-            news_data: 新闻数据
-            
-        Returns:
-            情感分析结果
         """
         title = news_data.get('title', '')
         summary = news_data.get('summary', '')
@@ -294,6 +301,7 @@ class NewsSentimentAnalyzer:
         result = self.sentiment_analyzer.analyze_text(full_text)
         
         # 添加新闻特定信息
+        result['title'] = title
         result['news_source'] = news_data.get('source', 'unknown')
         result['news_time'] = news_data.get('time', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))
         result['news_url'] = news_data.get('url', '')
@@ -303,12 +311,6 @@ class NewsSentimentAnalyzer:
     def batch_analyze_news(self, news_list: List[Dict]) -> Dict:
         """
         批量分析新闻
-        
-        Args:
-            news_list: 新闻列表
-            
-        Returns:
-            批量分析结果
         """
         individual_results = []
         all_scores = []
@@ -340,34 +342,38 @@ class NewsSentimentAnalyzer:
             'analysis_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }
     
-    def get_sentiment_summary(self, news_list: List[Dict]) -> str:
+    def get_sentiment_summary(self, analysis: Dict) -> str:
         """
-        获取情感摘要
-        
-        Args:
-            news_list: 新闻列表
+        根据分析结果生成综合总结
+        """
+        if not analysis or not analysis.get('individual_results'):
+            return "無可用新聞資料進行總結。"
             
-        Returns:
-            文本摘要
+        # 獲取前幾條新聞作為背景
+        news_summaries = []
+        for r in analysis.get('individual_results', []):
+            title = r.get('title', '無標題')
+            summ = r.get('summary', '無摘要')
+            news_summaries.append(f"- {title}: {summ}")
+            
+        prompt = f"""
+        請根據以下多條財經新聞的分析結果，寫一個簡短的「市場分析總結」（約 100-200 字）。
+        考慮整體情感趨向（{analysis.get('overall_sentiment', 'neutral')}）和平均分數（{analysis.get('average_score', 0.0):.2f}）。
+        
+        新聞摘要列表：
+        {chr(10).join(news_summaries[:5])}
+        
+        請用繁體中文回答，包含「整體評價」和「操盤建議」。
         """
-        analysis = self.batch_analyze_news(news_list)
         
-        summary = f"""
-新闻情感分析摘要
-{'='*50}
-
-分析新闻数量: {analysis['news_analyzed']}
-分析时间: {analysis['analysis_time']}
-
-整体情感: {analysis['overall_sentiment']}
-平均分数: {analysis['average_score']:.2f}
-
-情感分布:
-- 正面新闻: {analysis['positive_count']} 条
-- 负面新闻: {analysis['negative_count']} 条
-- 中性新闻: {analysis['neutral_count']} 条
-
-{'='*50}
-"""
-        
-        return summary
+        try:
+            if self.sentiment_analyzer.ai_enabled:
+                response = self.sentiment_analyzer.model.generate_content(prompt)
+                return response.text
+            else:
+                return f"由於 AI 未啟用，無法生成深度總結。當前整體情感為 {analysis.get('overall_sentiment', 'neutral')}，平均得分 {analysis.get('average_score', 0.0):.2f}。"
+        except Exception as e:
+            error_msg = str(e)
+            if "400" in error_msg and "location" in error_msg.lower():
+                return "⚠️ **AI 市場總結暫時無法生成**：偵測到 API 地區限制 (User location is not supported)。\n\n💡 **修復建議**：\n1. 請確認您的環境可以使用 Google Gemini 服務。\n2. 嘗試使用 VPN 或代理伺服器切換至支援區域（如美國、日本、台灣等）。\n3. 檢查您的 Gemini API Key 是否正確且有效。"
+            return f"生成總結時出錯: {error_msg}"

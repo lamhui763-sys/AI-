@@ -15,11 +15,46 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 
 from src.ai_inv.technical_analyzer import TechnicalAnalyzer
 from src.ai_inv.ai_analyzer import AIAnalyzer
-from src.ai_inv.sentiment_analyzer import SentimentAnalyzer
+from src.ai_inv.sentiment_analyzer import SentimentAnalyzer, NewsSentimentAnalyzer
 from src.ai_inv.smart_advisor import SmartAdvisor
 from src.ai_inv.backtester import BacktestEngine, MAStrategy, RSIStrategy, MACDStrategy
 from src.ai_inv.data_fetcher import DataFetcher
 from src.ai_inv.indicators import TechnicalIndicators # 确保导入
+
+# --- 強制重載模組以防止 Streamlit 緩存舊版本 ---
+import importlib
+def force_reload(module_name):
+    for name in [module_name, f"src.{module_name}"]:
+        if name in sys.modules:
+            importlib.reload(sys.modules[name])
+
+if not hasattr(DataFetcher, 'fetch_stock_news'):
+    force_reload('src.ai_inv.data_fetcher')
+    from src.ai_inv.data_fetcher import DataFetcher
+if not hasattr(NewsSentimentAnalyzer, 'batch_analyze_news'):
+    force_reload('src.ai_inv.sentiment_analyzer')
+    from src.ai_inv.sentiment_analyzer import NewsSentimentAnalyzer, SentimentAnalyzer
+
+# --- 辅助函数 ---
+
+def get_gemini_api_key():
+    """安全地获取 Gemini API 密钥，避免 Streamlit 秘密解析错误。"""
+    # 1. 尝试环境变量
+    api_key = os.getenv('GEMINI_API_KEY')
+    if api_key:
+        return api_key
+    
+    # 2. 尝试 Streamlit Secrets (带异常捕获)
+    try:
+        if st and hasattr(st, 'secrets'):
+            # 注意: 直接访问 st.secrets['KEY'] 或 'KEY' in st.secrets 
+            # 在没有 secrets.toml 时都会触发 StreamlitSecretNotFoundError
+            return st.secrets.get('GEMINI_API_KEY')
+    except Exception:
+        # 捕获 StreamlitSecretNotFoundError 等
+        pass
+        
+    return None
 
 # --- 绘图函数 (已修正数据列名称不匹配问题) ---
 
@@ -209,10 +244,39 @@ def technical_analysis_page():
         if show_macd: plot_macd_chart(df)
         if show_volume: plot_volume_chart(df)
 
+def get_serper_api_key():
+    """安全地獲取 Serper.dev API 密鑰。"""
+    api_key = os.getenv('SERPER_API_KEY')
+    if api_key:
+        return api_key
+    try:
+        if 'SERPER_API_KEY' in st.secrets:
+            return st.secrets['SERPER_API_KEY']
+    except: pass
+    return None
+
 def ai_analysis_page():
     st.header("🤖 AI分析")
-    if not (('GEMINI_API_KEY' in st.secrets and st.secrets['GEMINI_API_KEY']) or os.getenv('GEMINI_API_KEY')):
-        st.warning("请在 Streamlit Cloud 的 Secrets 中或本地环境变量中设置 GEMINI_API_KEY。") ; st.stop()
+    api_key = get_gemini_api_key()
+    if not api_key:
+        st.warning("⚠️ 未檢測到 Gemini API 金鑰。")
+        st.info("💡 目前需要配置 Gemini 及可選的 Serper.dev API 金鑰。")
+        st.markdown("""
+        ### 🔑 API 金鑰設置說明
+        本工具需要以下 API 金鑰：
+        
+        1. **Gemini API 金鑰**: 用於 AI 對話及深度分析 (免費/付費)。
+        2. **Serper.dev API 金鑰**: 用於「全網自動搜尋」最新新聞 (可選，每月 2500 次免費)。
+        
+        **設置方法:**
+        - 在專案根目錄的 `.env` 文件中添加：
+          ```env
+          GEMINI_API_KEY=您的金鑰
+          SERPER_API_KEY=您的金鑰
+          ```
+        - 或者在 Streamlit Cloud 的 Settings -> Secrets 中添加。
+        """)
+        st.stop()
 
     symbol = st.text_input("股票代码", value="^HSI")
     if st.button("开始AI分析", type="primary"):
@@ -324,9 +388,139 @@ def portfolio_page():
         if st.button("清空持仓"): st.session_state.holdings = []; st.rerun()
 
 def news_analysis_page():
-    st.header("📰 新闻情感分析")
-    if not (('GEMINI_API_KEY' in st.secrets and st.secrets['GEMINI_API_KEY']) or os.getenv('GEMINI_API_KEY')):
-        st.warning("请在 Secrets 中设置您的 GEMINI_API_KEY。") ; st.stop()
+    st.header("📰 新聞情感分析")
+    api_key = get_gemini_api_key()
+    if not api_key:
+        st.warning("⚠️ 未檢測到 Gemini API 金鑰。請參閱「AI分析」頁面中的說明進行設置。") ; st.stop()
+    
+    st.subheader("自動獲取新聞並分析")
+    c1, c2 = st.columns([3, 1])
+    news_symbol = c1.text_input("輸入股票代碼 (例如: 700.HK, ^HSI)", value="^HSI")
+    if c2.button("獲取並分析最新新聞", type="primary", use_container_width=True):
+        with st.spinner(f"正在獲取 {news_symbol} 的最新新聞..."):
+            try:
+                fetcher = DataFetcher()
+                news_items = fetcher.fetch_stock_news(news_symbol)
+                
+                if not news_items:
+                    st.warning(f"未能找到 {news_symbol} 的相關新聞。")
+                else:
+                    analyzer = NewsSentimentAnalyzer()
+                    analysis_res = analyzer.batch_analyze_news(news_items)
+                    
+                    st.success(f"成功分析了 {analysis_res['news_analyzed']} 條新聞")
+                    
+                    # 顯示總體情感
+                    sentiment = analysis_res['overall_sentiment']
+                    score = analysis_res['average_score']
+                    emoji = {"positive": "😊", "negative": "😔", "neutral": "😐"}.get(sentiment)
+                    
+                    sc1, sc2, sc3 = st.columns(3)
+                    sc1.metric("整體情感", f"{emoji} {sentiment.upper()}")
+                    sc2.metric("平均情感分數", f"{score:.2f}")
+                    sc3.metric("新聞數量", str(analysis_res['news_analyzed']))
+                    
+                    # 顯示 AI 綜合總結
+                    st.subheader("🤖 AI 市場分析總結")
+                    with st.spinner("AI 正在分析整體市場情緒並生成總結..."):
+                        summary = analyzer.get_sentiment_summary(analysis_res)
+                        st.info(summary)
+
+                    # 顯示分布
+                    st.progress(float((score + 1) / 2)) # 將 -1~1 映射到 0~1
+                    
+                    # 顯示新聞列表
+                    with st.expander("查看詳細新聞分析資料"):
+                        for item in analysis_res['individual_results']:
+                            it_sentiment = item['sentiment']
+                            it_emoji = {"positive": "🟢", "negative": "🔴", "neutral": "⚪"}.get(it_sentiment)
+                            st.markdown(f"{it_emoji} **{item['title']}**")
+                            st.caption(f"{item.get('news_source', 'N/A')} - {item.get('news_time', 'N/A')} | 分數: {item['score']:.2f}")
+                            
+                            # 顯示 AI 提取的概要或關鍵詞
+                            if item.get('keywords'):
+                                st.write(f"🏷️ **關鍵詞:** {', '.join(item['keywords'])}")
+                            if item.get('summary'):
+                                st.write(f"📝 **AI 摘要:** {item['summary']}")
+                                
+                            if item.get('news_url'):
+                                st.markdown(f"[閱讀全文]({item['news_url']})")
+                            st.divider()
+            except Exception as e:
+                st.error(f"❌ 自動分析時發生錯誤: {e}")
+
+    st.divider()
+    st.subheader("🌐 全網深度搜索分析 (Search Engines)")
+    st.info("💡 此功能會查詢全網最新財經資訊、論壇討論及分析報告，提供比標準新聞更全面的視角。")
+    
+    # 檢查是否有 Serper API Key
+    serper_key = get_serper_api_key()
+    
+    # 佈局：Live 搜索 vs 文件讀取
+    tabs = st.tabs(["🚀 自動即時搜索 (Live)", "📂 讀取已同步資料 (Cache)"])
+    
+    with tabs[0]:
+        if not serper_key:
+            st.warning("⚠️ 未檢測到 `SERPER_API_KEY`。請在 `.env` 中設置後即可啟用自動即時搜索。")
+            st.info("您也可以直接在對話框中叫我幫您搜索。")
+        else:
+            search_query = st.text_input("輸入搜索關鍵詞", value=f"{news_symbol} stock latest analysis news 2026", key="serper_query")
+            if st.button("立即執行全網深度檢索", type="primary", use_container_width=True):
+                with st.spinner(f"正在透過 Serper.dev 檢索 '{search_query}' 的最新資訊..."):
+                    fetcher = DataFetcher()
+                    search_news = fetcher.fetch_serper_news(search_query, serper_key)
+                    
+                    if not search_news:
+                        st.error("❌ 未能獲取搜索結果，請檢查 API Key 或關鍵詞。")
+                    else:
+                        analyzer = NewsSentimentAnalyzer()
+                        analysis_res = analyzer.batch_analyze_news(search_news)
+                        
+                        # 顯示結果 (與下方共用顯示邏輯)
+                        render_search_analysis(analysis_res, analyzer)
+
+    with tabs[1]:
+        search_file = "web_search_results.json"
+        if os.path.exists(search_file):
+            with open(search_file, "r", encoding="utf-8") as f:
+                search_data = json.load(f)
+            
+            st.success(f"已讀取到您與 AI 助手之前的同步資料（共 {len(search_data)} 條）。")
+            if st.button("分析緩存中的深度資訊", type="primary", use_container_width=True):
+                with st.spinner("AI 正在分析已同步的資料..."):
+                    fetcher = DataFetcher()
+                    search_news = fetcher.fetch_search_news(search_data)
+                    analyzer = NewsSentimentAnalyzer()
+                    analysis_res = analyzer.batch_analyze_news(search_news)
+                    render_search_analysis(analysis_res, analyzer)
+        else:
+            st.warning("⚠️ 目前沒有已同步的搜索資料。")
+
+def render_search_analysis(analysis_res, analyzer):
+    """渲染搜索分析結果的輔助函數"""
+    score = analysis_res['average_score']
+    sentiment = analysis_res['overall_sentiment']
+    emoji = {"positive": "🚀 BULLISH (看好)", "negative": "📉 BEARISH (看淡)", "neutral": "😐 NEUTRAL (中性)"}.get(sentiment)
+    
+    st.markdown(f"### 綜合研判: {emoji}")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("全網情感分數", f"{score:.2f}")
+    c2.metric("分析條目數", str(analysis_res['news_analyzed']))
+    c3.metric("正面/負面比", f"{analysis_res['positive_count']}/{analysis_res['negative_count']}")
+    
+    st.subheader("🤖 AI 市場深度總結")
+    st.info(analyzer.get_sentiment_summary(analysis_res))
+    
+    with st.expander("查看原始搜集條目"):
+        for item in analysis_res['individual_results']:
+            it_emoji = {"positive": "🟢", "negative": "🔴", "neutral": "⚪"}.get(item['sentiment'])
+            st.markdown(f"{it_emoji} **{item['title']}**")
+            st.write(item.get('summary', ''))
+            st.caption(f"來源: {item['news_source']} | [原始連結]({item.get('news_url', '#')})")
+            st.divider()
+
+    st.divider()
+    st.subheader("手動輸入分析")
     news_input = st.text_area("输入新闻内容进行分析", "", height=200)
     if st.button("分析情感", type="primary"):
         if not news_input.strip(): st.warning("请输入新闻内容。")
@@ -338,10 +532,9 @@ def news_analysis_page():
                     sentiment = res.get('sentiment', 'neutral')
                     emoji = {"positive": "😊", "negative": "😔", "neutral": "😐"}.get(sentiment)
                     c1,c2 = st.columns(2) 
-                    c1.metric("情感倾向", f"{emoji} {sentiment.upper()}")
-                    c2.metric("情感分数", f"{res.get('score', 0):.2f}")
-                    if res.get('keywords'): st.write("**关键词:** " + " | ".join(res.get('keywords', [])))
-                except Exception as e: st.error(f"❌ 分析时发生错误: {e}")
+                    if res.get('positive_words'): st.write("**正面詞彙:** " + " | ".join(res.get('positive_words')))
+                    if res.get('negative_words'): st.write("**負面詞彙:** " + " | ".join(res.get('negative_words')))
+                except Exception as e: st.error(f"❌ 手動分析時發生錯誤: {e}")
 
 def main():
     st.set_page_config(page_title="AI投资分析工具", page_icon="📈", layout="wide")

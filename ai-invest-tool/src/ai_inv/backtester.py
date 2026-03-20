@@ -61,6 +61,8 @@ class BacktestEngine:
         self.trades = []  # 交易记录
         self.equity_curve = []  # 资金曲线
         self.daily_returns = []  # 每日收益率
+        self.position_costs = {}  # 持仓成本 {symbol: avg_price}
+        self.trade_results = []  # 交易盈虧結果 [profit_amount, ...]
         
         # 重置引擎
         self.reset()
@@ -74,6 +76,8 @@ class BacktestEngine:
         self.trades = []
         self.equity_curve = []
         self.daily_returns = []
+        self.position_costs = {}
+        self.trade_results = []
         self.logger.info("回测引擎已重置")
     
     def run_backtest(self, data: pd.DataFrame, 
@@ -171,6 +175,13 @@ class BacktestEngine:
                 self.cash -= (trade_value + commission)
                 self.positions[symbol] = self.positions.get(symbol, 0) + quantity
                 
+                # 更新持倉成本 (包含手續費)
+                old_qty = self.positions.get(symbol, 0) - quantity
+                old_cost = self.position_costs.get(symbol, 0)
+                # 總投入 = 舊持倉總價 + 新買入總價(含手續費)
+                total_cost_basis = (old_qty * old_cost) + trade_value + commission
+                self.position_costs[symbol] = total_cost_basis / self.positions[symbol]
+
                 self.trades.append({
                     'date': date,
                     'action': 'buy',
@@ -191,9 +202,14 @@ class BacktestEngine:
                 actual_trade_value = sell_quantity * execution_price
                 actual_commission = actual_trade_value * self.commission
                 
-                self.cash += (actual_trade_value - actual_commission)
+                # 計算盈虧
+                buy_cost = sell_quantity * self.position_costs.get(symbol, 0)
+                profit = actual_trade_value - actual_commission - buy_cost
+                self.trade_results.append(profit)
+
                 self.positions[symbol] -= sell_quantity
                 if self.positions[symbol] == 0:
+                    self.position_costs[symbol] = 0
                     del self.positions[symbol]
                 
                 self.trades.append({
@@ -203,7 +219,8 @@ class BacktestEngine:
                     'quantity': sell_quantity,
                     'price': execution_price,
                     'value': actual_trade_value,
-                    'commission': actual_commission
+                    'commission': actual_commission,
+                    'profit': profit
                 })
     
     def _calculate_performance_metrics(self) -> Dict:
@@ -232,13 +249,10 @@ class BacktestEngine:
         # 交易统计
         trades_df = pd.DataFrame(self.trades)
         if not trades_df.empty:
-            total_trades = len(trades_df)
-            buy_trades = trades_df[trades_df['action'] == 'buy']
             sell_trades = trades_df[trades_df['action'] == 'sell']
-            # A simple win rate calculation based on selling higher than average buy price (can be improved)
-            # This is a simplification. A real win rate needs to match buys and sells.
-            winning_trades = len(sell_trades) # Placeholder logic
-            win_rate = (winning_trades / len(sell_trades) * 100) if not sell_trades.empty else 0
+            total_trades = len(sell_trades) # 以賣出(平倉)作為一筆完整交易
+            winning_trades = sum(1 for profit in self.trade_results if profit > 0)
+            win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
         else:
             total_trades = 0
             winning_trades = 0
